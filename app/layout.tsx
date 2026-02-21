@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "JG 交易教練",
+  title: "JG實驗室",
   description: "你的專屬交易教練平台",
 };
 

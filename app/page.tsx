@@ -30,7 +30,7 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="flex-1 flex flex-col items-center justify-center px-6 pt-20 pb-12">
         <h1 className="text-5xl md:text-7xl font-bold gradient-text mb-4 text-center">
-          JG 交易教練
+          JG實驗室
         </h1>
         <p className="text-[var(--text-secondary)] text-lg md:text-xl mb-10 text-center max-w-md">
           你的專屬交易教練平台 — 方向指引、AI 覆盤、成長追蹤

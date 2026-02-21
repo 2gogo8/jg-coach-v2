@@ -54,7 +54,7 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold text-center mb-8 gradient-text">JG 交易教練</h1>
+        <h1 className="text-3xl font-bold text-center mb-8 gradient-text">JG實驗室</h1>
 
         {/* Mode Toggle */}
         <div className="flex rounded-2xl bg-[var(--navy-light)] p-1 mb-6">
