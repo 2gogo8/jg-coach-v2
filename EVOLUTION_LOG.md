@@ -69,3 +69,62 @@
 - Add batch import from broker screenshot
 - Improve leaderboard engagement
 - Add weekly performance summary charts
+
+---
+
+### Round 2 (2026/02/22 02:00 → 02:30 Taipei)
+
+**Planning (Based on Round 1 Feedback):**
+Prioritized 3 improvements from "What's Next" list:
+1. Price change indicators (real-time market sentiment)
+2. Quick symbol suggestions (reduce friction for beginners)
+3. Public activity feed (boost community engagement)
+
+**Improvements Implemented:**
+
+1. **✅ Real-Time Price Change Indicators**
+   - Display stock price movement (▲/▼ + %) alongside validation
+   - Green for positive, red for negative
+   - Example: `✓ Apple Inc. ▲ +2.34%` or `✓ Tesla ▼ -1.52%`
+   - Uses existing FMP data (`changesPercentage` from `/stable/quote`)
+   - **Impact:** Students see immediate market context when logging trades
+
+2. **✅ Quick Symbol Suggestions**
+   - Pre-filled buttons for popular symbols when input is empty
+   - US market: AAPL, TSLA, NVDA, MSFT, GOOGL, AMZN
+   - TW market: 2330, 2454, 2317, 2412, 2303, 2308
+   - One-tap to auto-fill and fetch price
+   - **Impact:** New users don't need to remember tickers, faster workflow
+
+3. **✅ Public Activity Feed on Homepage**
+   - Shows last 8 trades across all students
+   - Displays: action (buy/sell), symbol, market, price, date
+   - Animated entrance for each item
+   - **Impact:** Creates sense of community, shows platform is active
+
+**Technical Details:**
+- Extended TradeModal state: `priceChange`, `priceChangePercent`
+- API `/api/stock-price` already returns these fields (no backend change)
+- Quick suggestions adapt to selected market (US/TW)
+- Homepage pulls trades via existing `/api/trades` endpoint
+- All changes client-side only (app/student/[id]/page.tsx, app/page.tsx)
+- TypeScript compilation: ✅ No errors
+
+**Deployment:**
+- Commit: `ca4571d` (feat(evolution-2): price change indicators + quick symbol suggestions + public activity feed)
+- Production: `https://jg-coach-v2.vercel.app`
+- Build time: ~14s (Turbopack)
+- Vercel deployment: ✅ Successful
+
+**Metrics:**
+- Files changed: 3 (app/student/[id]/page.tsx, app/page.tsx, no new files)
+- Lines added: ~94
+- New components: 0 (reused existing UI patterns)
+- API changes: 0 (utilized existing endpoints)
+
+**Next Round Ideas (Round 3):**
+- Add monthly comparison chart on student dashboard
+- Implement leaderboard view (currently API exists but no dedicated page)
+- Add "hot stocks" widget showing most-traded symbols today
+- Improve mobile responsiveness for trade modal
+- Add bulk trade import from CSV

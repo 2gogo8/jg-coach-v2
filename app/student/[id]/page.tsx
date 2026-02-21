@@ -32,16 +32,18 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
   const [socialProof, setSocialProof] = useState({ todayActive: 0, hotStock: '' });
   const [justSaved, setJustSaved] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [marketIndices, setMarketIndices] = useState<Array<{ name: string; symbol: string; price: number; change: number; changesPercentage: number | null }>>([]);
 
   const loadData = useCallback(async () => {
     try {
-      const [sRes, tRes, qRes, dRes, allTRes, allQRes] = await Promise.all([
+      const [sRes, tRes, qRes, dRes, allTRes, allQRes, mktRes] = await Promise.all([
         fetch(`/api/students/${id}`),
         fetch(`/api/trades?studentId=${id}`),
         fetch(`/api/questions?studentId=${id}`),
         fetch('/api/weekly-direction'),
         fetch('/api/trades'),
         fetch('/api/admin/stock-stats'),
+        fetch('/api/market-overview'),
       ]);
       if (sRes.ok) setStudent(await sRes.json());
       if (tRes.ok) setTrades(await tRes.json());
@@ -56,6 +58,10 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
       if (allQRes.ok) {
         const stats = await allQRes.json();
         if (stats.topStocks?.[0]) setSocialProof(prev => ({ ...prev, hotStock: stats.topStocks[0].symbol }));
+      }
+      if (mktRes.ok) {
+        const mktData = await mktRes.json();
+        if (mktData.indices) setMarketIndices(mktData.indices);
       }
     } finally { setLoading(false); }
   }, [id]);
@@ -186,6 +192,28 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
           >
             今天交易了什麼？
           </button>
+
+          {/* Market Overview */}
+          {marketIndices.length > 0 && (
+            <div className="glass rounded-2xl p-4">
+              <h3 className="text-sm font-medium text-[var(--text-tertiary)] mb-3">市場走勢</h3>
+              <div className="grid grid-cols-3 gap-3">
+                {marketIndices.map(idx => (
+                  <div key={idx.symbol} className="text-center">
+                    <div className="text-xs text-[var(--text-tertiary)] mb-1">{idx.name}</div>
+                    <div className={`text-sm font-semibold ${
+                      (idx.changesPercentage || idx.change) >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {idx.changesPercentage !== null && idx.changesPercentage !== undefined 
+                        ? `${idx.changesPercentage >= 0 ? '+' : ''}${idx.changesPercentage.toFixed(2)}%`
+                        : `${idx.change >= 0 ? '+' : ''}$${Math.abs(idx.change).toFixed(2)}`
+                      }
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Weekly Direction */}
           {direction && (
@@ -534,7 +562,8 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
         setStockName(data.name || '');
         setPriceChange(data.change || null);
         setPriceChangePercent(data.changesPercentage || null);
-        if (data.price && !price) {
+        // Always auto-fill price when we get valid data
+        if (data.price) {
           setPrice(data.price.toFixed(2));
         }
       } else {
@@ -545,6 +574,7 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
       }
     } catch {
       setSymbolValid(null);
+      setStockName('');
     } finally {
       setPriceLoading(false);
     }
@@ -664,11 +694,18 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
                     {stockName && (
                       <div className="flex items-center gap-2 px-1">
                         <p className="text-xs text-green-400">✓ {stockName}</p>
-                        {priceChangePercent !== null && (
+                        {priceChange !== null && priceChangePercent !== null && (
                           <span className={`text-xs font-medium flex items-center gap-0.5 ${
                             priceChangePercent >= 0 ? 'text-green-400' : 'text-red-400'
                           }`}>
                             {priceChangePercent >= 0 ? '▲' : '▼'} {priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%
+                          </span>
+                        )}
+                        {priceChange !== null && priceChangePercent === null && (
+                          <span className={`text-xs font-medium flex items-center gap-0.5 ${
+                            priceChange >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {priceChange >= 0 ? '▲' : '▼'} ${Math.abs(priceChange).toFixed(2)}
                           </span>
                         )}
                       </div>
@@ -778,6 +815,28 @@ function QuestionModal({ studentId, studentName, onClose }: { studentId: string;
           <button onClick={onClose}><XIcon className="w-5 h-5 text-[var(--text-tertiary)]" /></button>
         </div>
         <div className="p-5 space-y-4">
+          {/* Quick question templates */}
+          {!content && (
+            <div className="space-y-2">
+              <p className="text-xs text-[var(--text-tertiary)] px-1">或者選一個快速開始：</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  '這支股票現在適合買嗎？',
+                  '我該停損嗎？',
+                  '如何判斷進場時機？',
+                  '這個技術型態是什麼意思？',
+                ].map(template => (
+                  <button
+                    key={template}
+                    onClick={() => setContent(template)}
+                    className="px-3 py-1.5 rounded-lg text-xs bg-[var(--navy-lighter)] text-[var(--text-secondary)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)] transition-all"
+                  >
+                    {template}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="relative">
             <textarea placeholder="寫下你的問題或想法..." value={content} onChange={e => setContent(e.target.value)} rows={4}
               className="w-full px-4 py-3 rounded-2xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--blue)]/50 focus:outline-none resize-none transition-colors" />
