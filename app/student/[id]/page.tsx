@@ -551,19 +551,22 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
   const [priceChange, setPriceChange] = useState<number | null>(null);
   const [priceChangePercent, setPriceChangePercent] = useState<number | null>(null);
 
-  async function fetchStockPrice() {
-    if (!symbol || symbol.length < 1) return;
+  async function fetchStockPrice(symbolOverride?: string) {
+    const targetSymbol = symbolOverride || symbol;
+    if (!targetSymbol || targetSymbol.length < 1) return;
     setPriceLoading(true);
+    setSymbolValid(null); // Reset validation state
     try {
-      const res = await fetch(`/api/stock-price?symbol=${symbol.toUpperCase()}`);
+      const res = await fetch(`/api/stock-price?symbol=${targetSymbol.toUpperCase()}`);
       const data = await res.json();
       if (data.valid) {
         setSymbolValid(true);
         setStockName(data.name || '');
         setPriceChange(data.change || null);
         setPriceChangePercent(data.changesPercentage || null);
-        // Always auto-fill price when we get valid data
-        if (data.price) {
+        // Auto-fill price when we get valid data
+        // (Always fill when quick button clicked, or when input field is empty)
+        if (data.price && (symbolOverride || !price)) {
           setPrice(data.price.toFixed(2));
         }
       } else {
@@ -605,12 +608,20 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
     if (!symbol || !price || !shares || !date) return;
     setSaving(true);
     try {
-      await fetch('/api/trades', {
+      const response = await fetch('/api/trades', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId, symbol: symbol.toUpperCase(), market, action, price: Number(price), shares: Number(shares), date, note }),
       });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: '儲存失敗' }));
+        alert(error.error || '儲存失敗，請重試');
+        return;
+      }
       setSuccess(true);
       setTimeout(() => onClose(true), 800);
+    } catch (err) {
+      console.error('Save trade error:', err);
+      alert('網路錯誤，請檢查連線後重試');
     } finally { setSaving(false); }
   }
 
@@ -726,7 +737,7 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
                               key={sym}
                               onClick={() => {
                                 setSymbol(sym);
-                                setTimeout(() => fetchStockPrice(), 100);
+                                fetchStockPrice(sym); // ✅ Pass symbol directly to avoid state timing issue
                               }}
                               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--navy-lighter)] text-[var(--text-secondary)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)] transition-all"
                             >
