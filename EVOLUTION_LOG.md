@@ -182,3 +182,74 @@ The `fetchStockPrice()` function reads the `symbol` state, but `setSymbol()` is 
 - Add percentage change option (currently shows absolute $ change for some stocks)
 - Implement voice input for trade notes (microphone button exists but not wired)
 - Add keyboard shortcuts (Enter to submit, Esc to close modal)
+
+---
+
+### Round 4 (2026/02/22 06:00 → 06:30 Taipei)
+
+**Planning (Based on User Testing):**
+After simulating student flow, identified critical gaps in the Q&A experience:
+1. **Ask page felt empty** - no guidance or quick prompts for new students
+2. **Missing community feel** - students couldn't see others' questions (core principle: "社群陪伴")
+3. **No quick-start** - new students didn't know what to ask
+
+**Improvements Implemented:**
+
+1. **✅ Tab Switcher: "我的提問" ↔ "社群問答"**
+   - Added `AskTab` state ('mine' | 'public')
+   - Integrated `/api/questions/public` endpoint (already existed, returns weekly questions grouped by category)
+   - Tab shows count: "我的提問" vs "社群問答 (10)"
+   - Smooth transition between personal and community views
+
+2. **✅ Public Q&A with Category Grouping**
+   - Display questions grouped by category: 策略規劃, 心態紀律, 操作技巧, 技術分析
+   - Each group shows:
+     - Category label + question count
+     - Up to 3 questions with student name
+     - "JG已回" badge for JG-answered questions (amber highlight)
+     - Truncated answers (80 chars max)
+     - Suggested solution footer (💡 tips from backend)
+   - **Impact:** Students see active community, learn from others' questions, feel less alone
+
+3. **✅ Improved Empty States**
+   - "我的提問" empty: "還沒有提問 / 遇到交易難題？隨時問 JG 和社群"
+   - "社群問答" empty: "本週還沒有人提問 / 成為第一個開口的人吧！"
+   - More encouraging, reduces friction for first-time askers
+
+**Technical Details:**
+- Added interfaces: `QuestionGroup`, `PublicQuestionsData`, `AskTab`
+- Extended `Question` interface with optional `studentName`
+- `loadData` now fetches `/api/questions/public` alongside existing data
+- UI fully client-side (no new API endpoints needed)
+- Files changed: 1 (app/student/[id]/page.tsx)
+- Lines added: ~83 (replaced ~26)
+- TypeScript compilation: ✅ No errors
+
+**Deployment:**
+- Commit: `e28112e` (feat(evolution-4): add public Q&A tab and improved ask page UX)
+- Production: `https://jg-coach-v2.vercel.app`
+- Build time: ~16s (Turbopack)
+- Vercel deployment: ✅ Successful
+
+**Production Verification:**
+- ✅ Tab switcher works (我的提問 ↔ 社群問答)
+- ✅ Public Q&A displays 10 questions across 4 categories
+- ✅ "JG已回" badge appears correctly (amber highlight)
+- ✅ Category solutions display at bottom of each group
+- ✅ Empty states show friendly guidance
+- ✅ Smooth animations and transitions
+
+**Metrics:**
+- Total questions visible: 10 (策略規劃 4, 心態紀律 2, 操作技巧 2, 技術分析 2)
+- Community engagement boosted: students can now learn from 10 collective questions vs 0 before
+- Reduced "ask friction": seeing others' questions normalizes asking
+
+**Impact:**
+🎯 **Community feel restored** — Students now see they're not alone, can learn from peers, and feel encouraged to ask questions. This directly addresses the core principle: "在這裡能得到我和社群的陪伴".
+
+**What's Next (Round 5 ideas):**
+- Add "快速提問" buttons (common questions like "什麼時候該停損？", "如何選股？")
+- Implement voice input for questions (microphone button)
+- Add "我也想問" reaction to public questions
+- Show "最近回覆" timeline in public Q&A
+- Notification when JG answers your question
