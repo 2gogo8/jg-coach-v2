@@ -26,7 +26,6 @@ export default function AuthPage() {
     setLoading(true);
     try {
       if (studentMode === 'login') {
-        // Login with student ID
         const res = await fetch('/api/auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -34,18 +33,18 @@ export default function AuthPage() {
         });
         const data = await res.json();
         if (!res.ok) { setError(data.error || '找不到此帳號'); return; }
-        if (data.role === 'student') router.push(`/student/${data.studentId}`);
-        else setError('請使用學生帳號登入');
+        if (data.role === 'student') {
+          window.location.href = `/student/${data.studentId}`;
+        } else { setError('請使用學生帳號登入'); }
       } else {
-        // Register new student
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, code }),
         });
         const data = await res.json();
-        if (!res.ok) { setError(data.error); return; }
-        router.push(`/student/${data.studentId}`);
+        if (!res.ok) { setError(data.error || '註冊失敗，請確認邀請碼'); return; }
+        window.location.href = `/student/${data.studentId}`;
       }
     } catch { setError('連線失敗'); }
     finally { setLoading(false); }
@@ -61,8 +60,8 @@ export default function AuthPage() {
         body: JSON.stringify({ code: password }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error); return; }
-      if (data.role === 'admin') router.push('/admin');
+      if (!res.ok) { setError(data.error || '密碼錯誤'); return; }
+      if (data.role === 'admin') window.location.href = '/admin';
     } catch { setError('連線失敗'); }
     finally { setLoading(false); }
   }
