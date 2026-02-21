@@ -12,10 +12,13 @@ import {
 
 interface Student { id: string; name: string; xp: number; level: number; badges: string[]; streak: number; lastActiveDate: string; joinDate: string; }
 interface Trade { id: string; symbol: string; market: string; action: string; price: number; shares: number; date: string; note?: string; createdAt: string; studentId: string; }
-interface Question { id: string; content: string; category: string; answer?: string; answeredBy?: string; createdAt: string; }
+interface Question { id: string; content: string; category: string; answer?: string; answeredBy?: string; createdAt: string; studentName?: string; }
+interface QuestionGroup { category: string; label: string; count: number; questions: Question[]; suggestedSolution?: string; }
+interface PublicQuestionsData { weekStart: string; totalQuestions: number; groups: QuestionGroup[]; }
 interface WeeklyDir { content: string; weekStart: string; }
 
 type BottomTab = 'home' | 'record' | 'ask' | 'me';
+type AskTab = 'mine' | 'public';
 
 export default function StudentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -33,10 +36,12 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
   const [justSaved, setJustSaved] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [marketIndices, setMarketIndices] = useState<Array<{ name: string; symbol: string; price: number; change: number; changesPercentage: number | null }>>([]);
+  const [askTab, setAskTab] = useState<AskTab>('mine');
+  const [publicQuestions, setPublicQuestions] = useState<PublicQuestionsData | null>(null);
 
   const loadData = useCallback(async () => {
     try {
-      const [sRes, tRes, qRes, dRes, allTRes, allQRes, mktRes] = await Promise.all([
+      const [sRes, tRes, qRes, dRes, allTRes, allQRes, mktRes, pubQRes] = await Promise.all([
         fetch(`/api/students/${id}`),
         fetch(`/api/trades?studentId=${id}`),
         fetch(`/api/questions?studentId=${id}`),
@@ -44,10 +49,12 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
         fetch('/api/trades'),
         fetch('/api/admin/stock-stats'),
         fetch('/api/market-overview'),
+        fetch('/api/questions/public'),
       ]);
       if (sRes.ok) setStudent(await sRes.json());
       if (tRes.ok) setTrades(await tRes.json());
       if (qRes.ok) setQuestions(await qRes.json());
+      if (pubQRes.ok) setPublicQuestions(await pubQRes.json());
       if (dRes.ok) { const d = await dRes.json(); if (d) setDirection(d); }
       if (allTRes.ok) {
         const allTrades = await allTRes.json() as Trade[];
@@ -346,29 +353,105 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
 
       {activeTab === 'ask' && (
         <div className="px-5 py-4 animate-fade-in">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold">我的提問</h2>
+          {/* Tab switcher */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setAskTab('mine')}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                askTab === 'mine'
+                  ? 'bg-[var(--blue)] text-white'
+                  : 'bg-[var(--navy-lighter)] text-[var(--text-tertiary)]'
+              }`}
+            >
+              我的提問 {questions.length > 0 && `(${questions.length})`}
+            </button>
+            <button
+              onClick={() => setAskTab('public')}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                askTab === 'public'
+                  ? 'bg-[var(--blue)] text-white'
+                  : 'bg-[var(--navy-lighter)] text-[var(--text-tertiary)]'
+              }`}
+            >
+              社群問答 {publicQuestions && `(${publicQuestions.totalQuestions})`}
+            </button>
           </div>
-          <button onClick={() => setShowQuestionModal(true)} className="w-full py-4 mb-4 rounded-2xl bg-[var(--green-soft)] border border-[var(--green)]/20 text-green-400 text-base font-medium hover:bg-[var(--green)]/20 transition-all active:scale-[0.98]">
-            有什麼想法？
-          </button>
-          <div className="space-y-3">
-            {questions.map((q, i) => (
-              <div key={q.id} className={`glass rounded-2xl p-4 animate-fade-in ${q.answeredBy === 'jg' ? 'warm-glow' : ''}`} style={{ animationDelay: `${i * 40}ms` }}>
-                <p className="text-sm mb-2">{q.content}</p>
-                {q.answer ? (
-                  <div className={`p-3 rounded-xl text-sm ${q.answeredBy === 'jg' ? 'bg-[var(--amber-soft)] border border-[var(--amber)]/10' : 'bg-[var(--navy-lighter)]'}`}>
-                    <span className={`text-xs font-medium ${q.answeredBy === 'jg' ? 'text-[var(--amber)]' : 'text-[var(--text-secondary)]'}`}>
-                      {q.answeredBy === 'jg' ? 'JG 回覆' : 'AI 回覆'}
-                    </span>
-                    <p className="text-[var(--text-secondary)] mt-1">{q.answer}</p>
+
+          {askTab === 'mine' && (
+            <>
+              <button onClick={() => setShowQuestionModal(true)} className="w-full py-4 mb-4 rounded-2xl bg-[var(--green-soft)] border border-[var(--green)]/20 text-green-400 text-base font-medium hover:bg-[var(--green)]/20 transition-all active:scale-[0.98]">
+                有什麼想法？
+              </button>
+              
+              {questions.length === 0 && (
+                <div className="glass rounded-2xl p-8 text-center">
+                  <p className="text-[var(--text-tertiary)] mb-3">還沒有提問</p>
+                  <p className="text-sm text-[var(--text-secondary)]">遇到交易難題？隨時問 JG 和社群</p>
+                </div>
+              )}
+              
+              <div className="space-y-3">
+                {questions.map((q, i) => (
+                  <div key={q.id} className={`glass rounded-2xl p-4 animate-fade-in ${q.answeredBy === 'jg' ? 'warm-glow' : ''}`} style={{ animationDelay: `${i * 40}ms` }}>
+                    <p className="text-sm mb-2">{q.content}</p>
+                    {q.answer ? (
+                      <div className={`p-3 rounded-xl text-sm ${q.answeredBy === 'jg' ? 'bg-[var(--amber-soft)] border border-[var(--amber)]/10' : 'bg-[var(--navy-lighter)]'}`}>
+                        <span className={`text-xs font-medium ${q.answeredBy === 'jg' ? 'text-[var(--amber)]' : 'text-[var(--text-secondary)]'}`}>
+                          {q.answeredBy === 'jg' ? 'JG 回覆' : 'AI 回覆'}
+                        </span>
+                        <p className="text-[var(--text-secondary)] mt-1">{q.answer}</p>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-[var(--text-tertiary)]">等待回覆中...</span>
+                    )}
                   </div>
-                ) : (
-                  <span className="text-xs text-[var(--text-tertiary)]">等待回覆中...</span>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          )}
+
+          {askTab === 'public' && (
+            <div className="space-y-4">
+              {publicQuestions?.totalQuestions === 0 && (
+                <div className="glass rounded-2xl p-8 text-center">
+                  <p className="text-[var(--text-tertiary)]">本週還沒有人提問</p>
+                  <p className="text-sm text-[var(--text-secondary)] mt-2">成為第一個開口的人吧！</p>
+                </div>
+              )}
+              
+              {publicQuestions?.groups.map((group, gIdx) => (
+                <div key={group.category} className="glass rounded-2xl p-4 animate-fade-in" style={{ animationDelay: `${gIdx * 60}ms` }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-[var(--blue)]">{group.label}</h3>
+                    <span className="text-xs text-[var(--text-tertiary)]">{group.count} 個問題</span>
+                  </div>
+                  <div className="space-y-3">
+                    {group.questions.slice(0, 3).map((q, qIdx) => (
+                      <div key={q.id} className="border-t border-[var(--border)] pt-3 first:border-0 first:pt-0">
+                        <div className="flex items-start gap-2 mb-1.5">
+                          <span className="text-xs text-[var(--text-tertiary)]">{q.studentName || '匿名'}</span>
+                          {q.answeredBy === 'jg' && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--amber-soft)] text-[var(--amber)]">JG已回</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-[var(--text-secondary)] mb-2">{q.content}</p>
+                        {q.answer && (
+                          <div className="bg-[var(--navy-lighter)] rounded-lg p-2.5 text-xs text-[var(--text-tertiary)]">
+                            {q.answer.length > 80 ? q.answer.substring(0, 80) + '...' : q.answer}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {group.suggestedSolution && (
+                    <div className="mt-3 pt-3 border-t border-[var(--border)]">
+                      <p className="text-xs text-[var(--text-tertiary)]">💡 {group.suggestedSolution}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
