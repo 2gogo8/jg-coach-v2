@@ -9,13 +9,28 @@ interface WeeklyDir {
   weekStart: string;
 }
 
+interface Trade {
+  id: string;
+  symbol: string;
+  market: string;
+  action: string;
+  price: number;
+  shares: number;
+  date: string;
+  createdAt: string;
+  studentId: string;
+}
+
 export default function LandingPage() {
   const [stats, setStats] = useState({ trades: 0, students: 0 });
   const [direction, setDirection] = useState<WeeklyDir | null>(null);
+  const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
 
   useEffect(() => {
     fetch('/api/trades').then(r => r.json()).then(d => {
       setStats(prev => ({ ...prev, trades: d.length }));
+      // Get last 8 trades
+      setRecentTrades(d.slice(-8).reverse());
     }).catch(() => {});
     fetch('/api/admin/students').then(r => r.json()).then(d => {
       setStats(prev => ({ ...prev, students: d.length }));
@@ -82,6 +97,45 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      {/* Recent Activity Feed */}
+      {recentTrades.length > 0 && (
+        <section className="px-6 pb-16 max-w-4xl mx-auto w-full">
+          <div className="glass rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">實時動態</h3>
+              <span className="text-xs text-[var(--text-tertiary)]">最近 {recentTrades.length} 筆交易</span>
+            </div>
+            <div className="space-y-2">
+              {recentTrades.map((trade, i) => (
+                <div 
+                  key={trade.id} 
+                  className="flex items-center justify-between p-3 rounded-xl bg-[var(--navy-lighter)] hover:bg-[var(--navy-light)] transition-colors animate-fade-in"
+                  style={{ animationDelay: `${i * 50}ms` }}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`text-xs px-2 py-1 rounded-lg font-medium ${
+                      trade.action === 'buy' 
+                        ? 'bg-[var(--green-soft)] text-green-400' 
+                        : 'bg-[var(--red-soft)] text-red-400'
+                    }`}>
+                      {trade.action === 'buy' ? '買入' : '賣出'}
+                    </span>
+                    <div>
+                      <span className="text-sm font-semibold">{trade.symbol}</span>
+                      <span className="text-xs text-[var(--text-tertiary)] ml-2">{trade.market}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-[var(--text-secondary)]">${trade.price}</div>
+                    <div className="text-xs text-[var(--text-tertiary)]">{trade.date}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Weekly Direction Teaser */}
       {direction && (

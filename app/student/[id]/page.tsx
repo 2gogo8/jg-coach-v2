@@ -520,6 +520,8 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
   const [priceLoading, setPriceLoading] = useState(false);
   const [symbolValid, setSymbolValid] = useState<boolean | null>(null);
   const [stockName, setStockName] = useState('');
+  const [priceChange, setPriceChange] = useState<number | null>(null);
+  const [priceChangePercent, setPriceChangePercent] = useState<number | null>(null);
 
   async function fetchStockPrice() {
     if (!symbol || symbol.length < 1) return;
@@ -530,12 +532,16 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
       if (data.valid) {
         setSymbolValid(true);
         setStockName(data.name || '');
+        setPriceChange(data.change || null);
+        setPriceChangePercent(data.changesPercentage || null);
         if (data.price && !price) {
           setPrice(data.price.toFixed(2));
         }
       } else {
         setSymbolValid(false);
         setStockName('');
+        setPriceChange(null);
+        setPriceChangePercent(null);
       }
     } catch {
       setSymbolValid(null);
@@ -656,10 +662,42 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
                       </select>
                     </div>
                     {stockName && (
-                      <p className="text-xs text-green-400 px-1">✓ {stockName}</p>
+                      <div className="flex items-center gap-2 px-1">
+                        <p className="text-xs text-green-400">✓ {stockName}</p>
+                        {priceChangePercent !== null && (
+                          <span className={`text-xs font-medium flex items-center gap-0.5 ${
+                            priceChangePercent >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {priceChangePercent >= 0 ? '▲' : '▼'} {priceChangePercent >= 0 ? '+' : ''}{priceChangePercent.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
                     )}
                     {symbolValid === false && (
                       <p className="text-xs text-red-400 px-1">找不到此股票代號</p>
+                    )}
+                    {/* Quick symbol suggestions */}
+                    {!symbol && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-[var(--text-tertiary)] px-1">常用股票：</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(market === 'US' 
+                            ? ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL', 'AMZN']
+                            : ['2330', '2454', '2317', '2412', '2303', '2308']
+                          ).map(sym => (
+                            <button
+                              key={sym}
+                              onClick={() => {
+                                setSymbol(sym);
+                                setTimeout(() => fetchStockPrice(), 100);
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--navy-lighter)] text-[var(--text-secondary)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)] transition-all"
+                            >
+                              {sym}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                   <div className="flex rounded-xl bg-[var(--navy-lighter)] p-1">
