@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuth, logout } from '@/lib/auth';
+import { Toast } from '@/lib/toast';
 import {
   CameraIcon, ChatIcon, SearchIcon, ChartIcon,
   HomeIcon, PencilIcon, UserIcon, FireIcon,
@@ -30,6 +31,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
   const [loading, setLoading] = useState(true);
   const [socialProof, setSocialProof] = useState({ todayActive: 0, hotStock: '' });
   const [justSaved, setJustSaved] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -250,8 +252,14 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
               ))}
               {activities.length === 0 && (
                 <div className="text-center py-16 text-[var(--text-tertiary)]">
-                  <p className="text-base mb-1">還沒有紀錄</p>
-                  <p className="text-sm">記錄你的第一筆交易吧</p>
+                  <p className="text-base mb-2">還沒有紀錄</p>
+                  <p className="text-sm mb-4">開始你的交易日記，追蹤每一次成長</p>
+                  <button
+                    onClick={() => setShowTradeModal(true)}
+                    className="px-5 py-2 rounded-xl bg-[var(--blue-soft)] text-[var(--blue)] text-sm font-medium hover:bg-[var(--blue)]/20 transition-all"
+                  >
+                    記錄第一筆交易
+                  </button>
                 </div>
               )}
             </div>
@@ -444,6 +452,9 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
         </div>
       )}
 
+      {/* Toast */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       {/* Trade Modal */}
       {showTradeModal && (
         <TradeModal
@@ -452,7 +463,11 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
           defaultMarket={lastMarket}
           onClose={(saved) => {
             setShowTradeModal(false);
-            if (saved) { setJustSaved(true); setTimeout(() => setJustSaved(false), 1200); }
+            if (saved) { 
+              setJustSaved(true); 
+              setToast({ message: '交易已記錄！', type: 'success' });
+              setTimeout(() => setJustSaved(false), 1200); 
+            }
             loadData();
           }}
         />
@@ -502,6 +517,32 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [symbolValid, setSymbolValid] = useState<boolean | null>(null);
+  const [stockName, setStockName] = useState('');
+
+  async function fetchStockPrice() {
+    if (!symbol || symbol.length < 1) return;
+    setPriceLoading(true);
+    try {
+      const res = await fetch(`/api/stock-price?symbol=${symbol.toUpperCase()}`);
+      const data = await res.json();
+      if (data.valid) {
+        setSymbolValid(true);
+        setStockName(data.name || '');
+        if (data.price && !price) {
+          setPrice(data.price.toFixed(2));
+        }
+      } else {
+        setSymbolValid(false);
+        setStockName('');
+      }
+    } catch {
+      setSymbolValid(null);
+    } finally {
+      setPriceLoading(false);
+    }
+  }
 
   async function handleFile(file: File) {
     setOcrProcessing(true); setOcrProgress(10);
@@ -586,14 +627,40 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
                       <p className="line-clamp-2">{ocrText}</p>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <input placeholder="代號" value={symbol} onChange={e => setSymbol(e.target.value)}
-                      className="px-4 py-3 rounded-xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--blue)]/50 focus:outline-none transition-colors" />
-                    <select value={market} onChange={e => setMarket(e.target.value as 'US' | 'TW')}
-                      className="px-4 py-3 rounded-xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--blue)]/50 focus:outline-none transition-colors">
-                      <option value="US">美股</option>
-                      <option value="TW">台股</option>
-                    </select>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="relative">
+                        <input 
+                          placeholder="代號 (如 AAPL)" 
+                          value={symbol} 
+                          onChange={e => {
+                            setSymbol(e.target.value.toUpperCase());
+                            setSymbolValid(null);
+                            setStockName('');
+                          }}
+                          onBlur={() => symbol && fetchStockPrice()}
+                          className={`w-full px-4 py-3 rounded-xl bg-[var(--navy-lighter)] border text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--blue)]/50 focus:outline-none transition-colors ${
+                            symbolValid === true ? 'border-green-500/50' : symbolValid === false ? 'border-red-500/50' : 'border-[var(--border)]'
+                          }`}
+                        />
+                        {priceLoading && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <div className="w-4 h-4 border-2 border-[var(--blue)] border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+                      </div>
+                      <select value={market} onChange={e => setMarket(e.target.value as 'US' | 'TW')}
+                        className="px-4 py-3 rounded-xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] focus:border-[var(--blue)]/50 focus:outline-none transition-colors">
+                        <option value="US">美股</option>
+                        <option value="TW">台股</option>
+                      </select>
+                    </div>
+                    {stockName && (
+                      <p className="text-xs text-green-400 px-1">✓ {stockName}</p>
+                    )}
+                    {symbolValid === false && (
+                      <p className="text-xs text-red-400 px-1">找不到此股票代號</p>
+                    )}
                   </div>
                   <div className="flex rounded-xl bg-[var(--navy-lighter)] p-1">
                     <button onClick={() => setAction('buy')} className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${action === 'buy' ? 'bg-green-500/80 text-white' : 'text-[var(--text-tertiary)]'}`}>買入</button>
