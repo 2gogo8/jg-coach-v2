@@ -7,8 +7,10 @@ import { getAuth } from '@/lib/auth';
 export default function AuthPage() {
   const router = useRouter();
   const [mode, setMode] = useState<'student' | 'coach'>('student');
+  const [studentMode, setStudentMode] = useState<'register' | 'login'>('register');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,14 +25,28 @@ export default function AuthPage() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, code }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error); return; }
-      router.push(`/student/${data.studentId}`);
+      if (studentMode === 'login') {
+        // Login with student ID
+        const res = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: loginId.trim() }),
+        });
+        const data = await res.json();
+        if (!res.ok) { setError(data.error || '找不到此帳號'); return; }
+        if (data.role === 'student') router.push(`/student/${data.studentId}`);
+        else setError('請使用學生帳號登入');
+      } else {
+        // Register new student
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, code }),
+        });
+        const data = await res.json();
+        if (!res.ok) { setError(data.error); return; }
+        router.push(`/student/${data.studentId}`);
+      }
     } catch { setError('連線失敗'); }
     finally { setLoading(false); }
   }
@@ -75,27 +91,69 @@ export default function AuthPage() {
 
         {mode === 'student' ? (
           <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="你的名字"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="w-full px-4 py-3.5 rounded-2xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--blue)] focus:outline-none transition-colors text-base"
-            />
-            <input
-              type="text"
-              placeholder="邀請碼"
-              value={code}
-              onChange={e => setCode(e.target.value)}
-              className="w-full px-4 py-3.5 rounded-2xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--blue)] focus:outline-none transition-colors text-base"
-            />
-            <button
-              onClick={handleStudent}
-              disabled={loading || !name.trim() || !code.trim()}
-              className="w-full py-3.5 rounded-2xl bg-[var(--blue)] text-white font-semibold text-base hover:bg-[var(--blue-light)] transition-colors disabled:opacity-50"
-            >
-              {loading ? '登入中...' : '開始學習'}
-            </button>
+            {/* Student sub-toggle */}
+            <div className="flex rounded-xl bg-[var(--navy-lighter)] p-0.5 mb-2">
+              {(['register', 'login'] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => { setStudentMode(m); setError(''); }}
+                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
+                    studentMode === m
+                      ? 'bg-[var(--navy-light)] text-[var(--text-primary)]'
+                      : 'text-[var(--text-secondary)]'
+                  }`}
+                >
+                  {m === 'register' ? '新學生註冊' : '已有帳號'}
+                </button>
+              ))}
+            </div>
+
+            {studentMode === 'register' ? (
+              <>
+                <input
+                  type="text"
+                  placeholder="你的名字"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--blue)] focus:outline-none transition-colors text-base"
+                />
+                <input
+                  type="text"
+                  placeholder="邀請碼"
+                  value={code}
+                  onChange={e => setCode(e.target.value)}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--blue)] focus:outline-none transition-colors text-base"
+                />
+                <button
+                  onClick={handleStudent}
+                  disabled={loading || !name.trim() || !code.trim()}
+                  className="w-full py-3.5 rounded-2xl bg-[var(--blue)] text-white font-semibold text-base hover:bg-[var(--blue-light)] transition-colors disabled:opacity-50"
+                >
+                  {loading ? '註冊中...' : '開始學習'}
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  placeholder="你的學生 ID"
+                  value={loginId}
+                  onChange={e => setLoginId(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleStudent()}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--blue)] focus:outline-none transition-colors text-base"
+                />
+                <button
+                  onClick={handleStudent}
+                  disabled={loading || !loginId.trim()}
+                  className="w-full py-3.5 rounded-2xl bg-[var(--blue)] text-white font-semibold text-base hover:bg-[var(--blue-light)] transition-colors disabled:opacity-50"
+                >
+                  {loading ? '登入中...' : '登入'}
+                </button>
+                <p className="text-xs text-center text-[var(--text-secondary)]">
+                  學生 ID 在註冊後會顯示在個人頁面
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-4">

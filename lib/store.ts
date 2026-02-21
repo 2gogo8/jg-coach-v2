@@ -1,5 +1,7 @@
 // In-memory store — MVP phase, will migrate to Supabase
 
+export type BadgeId = 'first-trade' | 'streak-7' | 'streak-30' | 'scholar' | 'jg-certified' | 'veteran';
+
 export interface Student {
   id: string;
   name: string;
@@ -7,11 +9,17 @@ export interface Student {
   phone?: string;
   joinDate: string;
   experience: 'beginner' | 'intermediate' | 'advanced';
-  style: string;        // 短線、波段、長線、混合
-  goal: string;         // 學生的目標
-  brokers: string[];    // 使用的券商
-  note: string;         // JG 的備註
-  tags: string[];       // 標籤（如：停損差、追高、情緒化）
+  style: string;
+  goal: string;
+  brokers: string[];
+  note: string;
+  tags: string[];
+  // Gamification
+  xp: number;
+  level: number;
+  badges: BadgeId[];
+  streak: number;
+  lastActiveDate: string; // YYYY-MM-DD
   createdAt: string;
 }
 
@@ -64,14 +72,137 @@ export interface StockQuery {
   createdAt: string;
 }
 
-// Storage
+// ─── Level / XP System ───
+export const LEVEL_TABLE: { level: number; xpRequired: number; title: string }[] = [
+  { level: 1, xpRequired: 0, title: '新手' },
+  { level: 2, xpRequired: 50, title: '新手' },
+  { level: 3, xpRequired: 120, title: '新手' },
+  { level: 4, xpRequired: 200, title: '新手' },
+  { level: 5, xpRequired: 300, title: '見習生' },
+  { level: 6, xpRequired: 420, title: '見習生' },
+  { level: 7, xpRequired: 560, title: '見習生' },
+  { level: 8, xpRequired: 720, title: '見習生' },
+  { level: 9, xpRequired: 900, title: '見習生' },
+  { level: 10, xpRequired: 1100, title: '交易員' },
+  { level: 11, xpRequired: 1320, title: '交易員' },
+  { level: 12, xpRequired: 1560, title: '交易員' },
+  { level: 13, xpRequired: 1820, title: '交易員' },
+  { level: 14, xpRequired: 2100, title: '交易員' },
+  { level: 15, xpRequired: 2400, title: '交易員' },
+  { level: 16, xpRequired: 2720, title: '交易員' },
+  { level: 17, xpRequired: 3060, title: '交易員' },
+  { level: 18, xpRequired: 3420, title: '交易員' },
+  { level: 19, xpRequired: 3800, title: '交易員' },
+  { level: 20, xpRequired: 4200, title: '操盤手' },
+  { level: 25, xpRequired: 6000, title: '操盤手' },
+  { level: 30, xpRequired: 8500, title: '操盤手' },
+  { level: 35, xpRequired: 11500, title: '操盤手' },
+  { level: 40, xpRequired: 15000, title: '操盤手' },
+  { level: 45, xpRequired: 19000, title: '操盤手' },
+  { level: 50, xpRequired: 25000, title: '大師' },
+];
+
+export function getLevelInfo(xp: number): { level: number; title: string; currentXp: number; nextLevelXp: number; progress: number } {
+  let current = LEVEL_TABLE[0];
+  let next = LEVEL_TABLE[1];
+  for (let i = LEVEL_TABLE.length - 1; i >= 0; i--) {
+    if (xp >= LEVEL_TABLE[i].xpRequired) {
+      current = LEVEL_TABLE[i];
+      next = LEVEL_TABLE[i + 1] || { ...current, xpRequired: current.xpRequired + 5000 };
+      break;
+    }
+  }
+  const range = next.xpRequired - current.xpRequired;
+  const progress = range > 0 ? ((xp - current.xpRequired) / range) * 100 : 100;
+  return { level: current.level, title: current.title, currentXp: xp, nextLevelXp: next.xpRequired, progress: Math.min(progress, 100) };
+}
+
+export const BADGE_DEFS: Record<BadgeId, { name: string; desc: string }> = {
+  'first-trade': { name: '首筆交易', desc: '記錄你的第一筆交易' },
+  'streak-7': { name: '連續 7 天', desc: '連續記錄交易 7 天' },
+  'streak-30': { name: '連續 30 天', desc: '連續記錄交易 30 天' },
+  'scholar': { name: '好學者', desc: '累計提問 10 次' },
+  'jg-certified': { name: 'JG 認證', desc: '獲得 JG 回覆 5 次' },
+  'veteran': { name: '百戰老將', desc: '累計記錄 100 筆交易' },
+};
+
+function calcStreak(studentId: string): number {
+  const studentTrades = trades.filter(t => t.studentId === studentId);
+  if (studentTrades.length === 0) return 0;
+  const dates = [...new Set(studentTrades.map(t => t.date))].sort().reverse();
+  let count = 1;
+  for (let i = 1; i < dates.length; i++) {
+    const d1 = new Date(dates[i - 1]);
+    const d2 = new Date(dates[i]);
+    const diff = (d1.getTime() - d2.getTime()) / 86400000;
+    if (diff <= 1) count++; else break;
+  }
+  return count;
+}
+
+function checkAndAwardBadges(student: Student): BadgeId[] {
+  const newBadges: BadgeId[] = [];
+  const studentTrades = trades.filter(t => t.studentId === student.id);
+  const studentQs = questions.filter(q => q.studentId === student.id);
+  const jgReplies = studentQs.filter(q => q.answeredBy === 'jg').length;
+
+  if (studentTrades.length >= 1 && !student.badges.includes('first-trade')) {
+    student.badges.push('first-trade');
+    newBadges.push('first-trade');
+  }
+  if (student.streak >= 7 && !student.badges.includes('streak-7')) {
+    student.badges.push('streak-7');
+    newBadges.push('streak-7');
+  }
+  if (student.streak >= 30 && !student.badges.includes('streak-30')) {
+    student.badges.push('streak-30');
+    newBadges.push('streak-30');
+  }
+  if (studentQs.length >= 10 && !student.badges.includes('scholar')) {
+    student.badges.push('scholar');
+    newBadges.push('scholar');
+  }
+  if (jgReplies >= 5 && !student.badges.includes('jg-certified')) {
+    student.badges.push('jg-certified');
+    newBadges.push('jg-certified');
+  }
+  if (studentTrades.length >= 100 && !student.badges.includes('veteran')) {
+    student.badges.push('veteran');
+    newBadges.push('veteran');
+  }
+  return newBadges;
+}
+
+function awardXp(student: Student, amount: number): { xpGained: number; leveledUp: boolean; oldLevel: number; newLevel: number; newBadges: BadgeId[] } {
+  const oldLevel = getLevelInfo(student.xp).level;
+  student.xp += amount;
+  const newInfo = getLevelInfo(student.xp);
+  const newBadges = checkAndAwardBadges(student);
+  student.level = newInfo.level;
+  return { xpGained: amount, leveledUp: newInfo.level > oldLevel, oldLevel, newLevel: newInfo.level, newBadges };
+}
+
+function updateStreak(student: Student): boolean {
+  const today = new Date().toISOString().split('T')[0];
+  if (student.lastActiveDate === today) return false; // already active today
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  if (student.lastActiveDate === yesterday) {
+    student.streak += 1;
+  } else {
+    student.streak = 1;
+  }
+  student.lastActiveDate = today;
+  return student.streak > 1; // true if streak continues
+}
+
+// ─── Storage ───
 const stockQueries: StockQuery[] = [];
 const students = new Map<string, Student>([
-  ['s1', { id: 's1', name: '王小明', joinDate: '2026-02-10', experience: 'intermediate', style: '短線', goal: '學習停損紀律', brokers: ['富邦'], note: '科技股為主，停損執行力待加強', tags: ['停損差', '科技股'], createdAt: '2026-02-10T00:00:00Z' }],
-  ['s2', { id: 's2', name: '李雅婷', joinDate: '2026-02-10', experience: 'intermediate', style: '波段', goal: '建立穩定獲利系統', brokers: ['永豐'], note: '跟隨JG方向操作，紀律不錯', tags: ['能源', '國防'], createdAt: '2026-02-10T00:00:00Z' }],
-  ['s3', { id: 's3', name: '陳志偉', joinDate: '2026-02-11', experience: 'beginner', style: '短線', goal: '不要再追高殺低', brokers: ['群益'], note: '典型追高殺低，需要心態輔導', tags: ['追高', '情緒化', '需關注'], createdAt: '2026-02-11T00:00:00Z' }],
-  ['s4', { id: 's4', name: '林佩君', joinDate: '2026-02-12', experience: 'beginner', style: '長線', goal: '學習美股投資', brokers: ['富邦'], note: '台股轉美股，基本面導向', tags: ['台股', '穩健'], createdAt: '2026-02-12T00:00:00Z' }],
-  ['s5', { id: 's5', name: '張家豪', joinDate: '2026-02-12', experience: 'advanced', style: '短線', goal: '提高勝率', brokers: ['永豐', '群益'], note: '交易頻率高，需控制手癢', tags: ['高頻', '積極型'], createdAt: '2026-02-12T00:00:00Z' }],
+  ['s1', { id: 's1', name: '王小明', joinDate: '2026-02-10', experience: 'intermediate', style: '短線', goal: '學習停損紀律', brokers: ['富邦'], note: '科技股為主，停損執行力待加強', tags: ['停損差', '科技股'], xp: 190, level: 4, badges: ['first-trade'], streak: 9, lastActiveDate: '2026-02-20', createdAt: '2026-02-10T00:00:00Z' }],
+  ['s2', { id: 's2', name: '李雅婷', joinDate: '2026-02-10', experience: 'intermediate', style: '波段', goal: '建立穩定獲利系統', brokers: ['永豐'], note: '跟隨JG方向操作，紀律不錯', tags: ['能源', '國防'], xp: 230, level: 4, badges: ['first-trade', 'streak-7'], streak: 9, lastActiveDate: '2026-02-20', createdAt: '2026-02-10T00:00:00Z' }],
+  ['s3', { id: 's3', name: '陳志偉', joinDate: '2026-02-11', experience: 'beginner', style: '短線', goal: '不要再追高殺低', brokers: ['群益'], note: '典型追高殺低，需要心態輔導', tags: ['追高', '情緒化', '需關注'], xp: 155, level: 3, badges: ['first-trade'], streak: 9, lastActiveDate: '2026-02-20', createdAt: '2026-02-11T00:00:00Z' }],
+  ['s4', { id: 's4', name: '林佩君', joinDate: '2026-02-12', experience: 'beginner', style: '長線', goal: '學習美股投資', brokers: ['富邦'], note: '台股轉美股，基本面導向', tags: ['台股', '穩健'], xp: 175, level: 3, badges: ['first-trade', 'streak-7'], streak: 9, lastActiveDate: '2026-02-20', createdAt: '2026-02-12T00:00:00Z' }],
+  ['s5', { id: 's5', name: '張家豪', joinDate: '2026-02-12', experience: 'advanced', style: '短線', goal: '提高勝率', brokers: ['永豐', '群益'], note: '交易頻率高，需控制手癢', tags: ['高頻', '積極型'], xp: 280, level: 5, badges: ['first-trade', 'streak-7'], streak: 9, lastActiveDate: '2026-02-20', createdAt: '2026-02-12T00:00:00Z' }],
 ]);
 const trades: TradeEntry[] = [
   { id: 't01', studentId: 's1', symbol: 'NVDA', market: 'US', action: 'buy', price: 187.50, shares: 10, date: '2026-02-12', note: '突破前高買入', createdAt: '2026-02-12T14:30:00Z' },
@@ -144,10 +275,9 @@ function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-// ─── Demo Seed Data ───
 // ─── Students ───
-export function addStudent(data: Omit<Student, 'id' | 'createdAt'>): Student {
-  const student: Student = { ...data, id: genId(), createdAt: new Date().toISOString() };
+export function addStudent(data: Omit<Student, 'id' | 'createdAt' | 'xp' | 'level' | 'badges' | 'streak' | 'lastActiveDate'>): Student {
+  const student: Student = { ...data, id: genId(), xp: 0, level: 1, badges: [], streak: 0, lastActiveDate: '', createdAt: new Date().toISOString() };
   students.set(student.id, student);
   return student;
 }
@@ -177,11 +307,25 @@ export function searchStudents(query: string): Student[] {
   );
 }
 
-// ─── Trades ───
-export function addTrade(data: Omit<TradeEntry, 'id' | 'createdAt'>): TradeEntry {
+// ─── Trades (with XP) ───
+export function addTrade(data: Omit<TradeEntry, 'id' | 'createdAt'>): { trade: TradeEntry; xpResult?: ReturnType<typeof awardXp> } {
   const trade: TradeEntry = { ...data, id: genId(), createdAt: new Date().toISOString() };
   trades.unshift(trade);
-  return trade;
+  const student = students.get(data.studentId);
+  let xpResult: ReturnType<typeof awardXp> | undefined;
+  if (student) {
+    let xpAmount = 10; // base trade XP
+    const streakContinued = updateStreak(student);
+    student.streak = calcStreak(student.id);
+    if (streakContinued && student.streak > 1) xpAmount += 20; // streak bonus
+    xpResult = awardXp(student, xpAmount);
+  }
+  return { trade, xpResult };
+}
+
+// Backward compat: some API routes expect just TradeEntry
+export function addTradeCompat(data: Omit<TradeEntry, 'id' | 'createdAt'>): TradeEntry {
+  return addTrade(data).trade;
 }
 
 export function getTradesByStudent(studentId: string): TradeEntry[] {
@@ -192,20 +336,33 @@ export function getAllTrades(): TradeEntry[] {
   return trades;
 }
 
-// ─── Questions ───
-export function addQuestion(data: Omit<Question, 'id' | 'createdAt'>): Question {
+// ─── Questions (with XP) ───
+export function addQuestion(data: Omit<Question, 'id' | 'createdAt'>): { question: Question; xpResult?: ReturnType<typeof awardXp> } {
   const q: Question = { ...data, id: genId(), createdAt: new Date().toISOString() };
   questions.unshift(q);
-  return q;
+  const student = students.get(data.studentId);
+  let xpResult: ReturnType<typeof awardXp> | undefined;
+  if (student) {
+    xpResult = awardXp(student, 5);
+  }
+  return { question: q, xpResult };
 }
 
-export function answerQuestion(id: string, answer: string, by: 'jg' | 'ai'): Question | null {
+export function answerQuestion(id: string, answer: string, by: 'jg' | 'ai'): { question: Question | null; xpResult?: ReturnType<typeof awardXp> } {
   const q = questions.find(q => q.id === id);
-  if (!q) return null;
+  if (!q) return { question: null };
   q.answer = answer;
   q.answeredBy = by;
   q.answeredAt = new Date().toISOString();
-  return q;
+  // Award XP to student for getting a JG reply
+  let xpResult: ReturnType<typeof awardXp> | undefined;
+  if (by === 'jg') {
+    const student = students.get(q.studentId);
+    if (student) {
+      xpResult = awardXp(student, 15);
+    }
+  }
+  return { question: q, xpResult };
 }
 
 export function getQuestionsByStudent(studentId: string): Question[] {
@@ -241,7 +398,6 @@ export function getWeeklyDirection(): WeeklyDirection | null {
 
 // ─── Insights ───
 export function addInsight(data: { content: string; tickers?: string[]; category?: Insight['category'] }): Insight {
-  // Auto-extract tickers from content if not provided
   const tickers = data.tickers && data.tickers.length > 0
     ? data.tickers
     : extractTickers(data.content);
@@ -273,8 +429,7 @@ function extractTickers(text: string): string[] {
   return [...new Set(matches.filter(m => m.length >= 2 && !common.has(m)))];
 }
 
-// ─── Stock Queries ───
-// Seed data
+// ─── Stock Queries (with XP) ───
 stockQueries.push(
   { id: 'sq1', studentId: 's1', studentName: '王小明', symbol: 'NVDA', createdAt: '2026-02-18T10:00:00Z' },
   { id: 'sq2', studentId: 's1', studentName: '王小明', symbol: 'AMD', createdAt: '2026-02-19T09:00:00Z' },
@@ -315,6 +470,37 @@ export function getStockQueryStats(): { symbol: string; count: number; lastQueri
     .sort((a, b) => b.count - a.count);
 }
 
+// ─── Daily Missions ───
+export function getDailyMissions(studentId: string): { id: string; label: string; done: boolean }[] {
+  const today = new Date().toISOString().split('T')[0];
+  const todayTrades = trades.filter(t => t.studentId === studentId && t.date === today);
+  const todayQs = questions.filter(q => q.studentId === studentId && q.createdAt.startsWith(today));
+  const todayQueries = stockQueries.filter(q => q.studentId === studentId && q.createdAt.startsWith(today));
+  return [
+    { id: 'trade', label: '記錄今日交易', done: todayTrades.length > 0 },
+    { id: 'question', label: '提出一個問題', done: todayQs.length > 0 },
+    { id: 'query', label: '查詢一檔股票', done: todayQueries.length > 0 },
+  ];
+}
+
+// ─── Leaderboard ───
+export function getLeaderboard(): { rank: number; name: string; xp: number; level: number; title: string; streak: number; isTopWeekly: boolean }[] {
+  const all = getAllStudents();
+  const sorted = all.sort((a, b) => b.xp - a.xp);
+  return sorted.map((s, i) => {
+    const info = getLevelInfo(s.xp);
+    return {
+      rank: i + 1,
+      name: s.name,
+      xp: s.xp,
+      level: info.level,
+      title: info.title,
+      streak: s.streak,
+      isTopWeekly: i === 0,
+    };
+  });
+}
+
 // ─── Analytics ───
 export function getStudentAnalytics(studentId: string) {
   const studentTrades = getTradesByStudent(studentId);
@@ -328,31 +514,11 @@ export function getStudentAnalytics(studentId: string) {
   const sells = studentTrades.filter(t => t.action === 'sell');
   const symbols = [...new Set(studentTrades.map(t => t.symbol))];
 
-  // Detect patterns that need help
   const needsHelp: string[] = [];
-
-  // Check concentration
-  if (symbols.length <= 2 && studentTrades.length >= 5) {
-    needsHelp.push('持倉過度集中');
-  }
-
-  // Check if only buying, never selling
-  if (buys.length > 5 && sells.length === 0) {
-    needsHelp.push('只買不賣，缺乏停利/停損紀律');
-  }
-
-  // Check question patterns
+  if (symbols.length <= 2 && studentTrades.length >= 5) needsHelp.push('持倉過度集中');
+  if (buys.length > 5 && sells.length === 0) needsHelp.push('只買不賣，缺乏停利/停損紀律');
   const mindsetQs = studentQuestions.filter(q => q.category === 'mindset');
-  if (mindsetQs.length >= 3) {
-    needsHelp.push('心態問題頻繁，需要情緒管理指導');
-  }
+  if (mindsetQs.length >= 3) needsHelp.push('心態問題頻繁，需要情緒管理指導');
 
-  return {
-    totalTrades: studentTrades.length,
-    buys: buys.length,
-    sells: sells.length,
-    symbols,
-    questionCount: studentQuestions.length,
-    needsHelp,
-  };
+  return { totalTrades: studentTrades.length, buys: buys.length, sells: sells.length, symbols, questionCount: studentQuestions.length, needsHelp };
 }

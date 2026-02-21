@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   if (!studentId || !symbol || !action || !price || !shares || !date) {
     return NextResponse.json({ error: '缺少必要欄位' }, { status: 400 });
   }
-  const trade = addTrade({
+  const { trade, xpResult } = addTrade({
     studentId,
     symbol: symbol.toUpperCase(),
     market: market || 'US',
@@ -26,5 +26,5 @@ export async function POST(request: Request) {
     date,
     note,
   });
-  return NextResponse.json(trade, { status: 201 });
+  return NextResponse.json({ ...trade, xpResult }, { status: 201 });
 }

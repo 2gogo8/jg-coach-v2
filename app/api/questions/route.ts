@@ -19,6 +19,6 @@ export async function POST(request: Request) {
   if (!studentId || !content) {
     return NextResponse.json({ error: '缺少必要欄位' }, { status: 400 });
   }
-  const q = addQuestion({ studentId, studentName: studentName || '', content, category: category || 'other' });
-  return NextResponse.json(q, { status: 201 });
+  const { question, xpResult } = addQuestion({ studentId, studentName: studentName || '', content, category: category || 'other' });
+  return NextResponse.json({ ...question, xpResult }, { status: 201 });
 }

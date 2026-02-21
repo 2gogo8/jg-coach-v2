@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     imageBase64 = `data:${imageFile.type};base64,${Buffer.from(buffer).toString('base64')}`;
   }
 
-  const trade = addTrade({
+  const { trade, xpResult } = addTrade({
     studentId,
     symbol: symbol.toUpperCase(),
     market: market as 'US' | 'TW',
@@ -37,5 +37,5 @@ export async function POST(request: Request) {
     imageBase64,
   });
 
-  return NextResponse.json(trade, { status: 201 });
+  return NextResponse.json({ ...trade, xpResult }, { status: 201 });
 }
