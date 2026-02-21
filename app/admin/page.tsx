@@ -6,6 +6,7 @@ import { getAuth, logout } from '@/lib/auth';
 
 interface StudentWithAnalytics {
   id: string; name: string; joinDate: string; experience: string; style: string; goal: string; tags: string[];
+  xp: number; level: number; badges: string[]; streak: number;
   analytics: { totalTrades: number; buys: number; sells: number; symbols: string[]; questionCount: number; needsHelp: string[] };
 }
 interface Question { id: string; studentId: string; studentName: string; content: string; category: string; answer?: string; createdAt: string; }
@@ -210,7 +211,7 @@ export default function AdminPage() {
                 <button onClick={() => setExpandedStudent(expandedStudent === s.id ? null : s.id)} className="w-full p-4 text-left flex items-center justify-between">
                   <div>
                     <div className="font-semibold">{s.name}</div>
-                    <div className="text-xs text-[var(--text-secondary)]">{s.style} · {s.experience} · {s.analytics.totalTrades} 筆交易</div>
+                    <div className="text-xs text-[var(--text-secondary)]">Lv.{s.level} · {s.xp} XP · {s.streak}天連續 · {s.analytics.totalTrades} 筆交易</div>
                   </div>
                   <div className="flex items-center gap-2">
                     {s.analytics.needsHelp.length > 0 && <span className="w-2 h-2 rounded-full bg-[var(--amber)]" />}
