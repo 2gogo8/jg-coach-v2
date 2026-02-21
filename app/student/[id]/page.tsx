@@ -572,13 +572,16 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
           studentId={id}
           defaultSymbol={lastSymbol}
           defaultMarket={lastMarket}
-          onClose={(saved) => {
+          onClose={(saved, newTrade?) => {
             setShowTradeModal(false);
-            if (saved) { 
+            if (saved && newTrade) { 
+              // Optimistic update: add new trade immediately to local state
+              setTrades(prev => [newTrade, ...prev]);
               setJustSaved(true); 
               setToast({ message: '交易已記錄！', type: 'success' });
               setTimeout(() => setJustSaved(false), 1200); 
             }
+            // Still call loadData to sync with server (in case data persists)
             loadData();
           }}
         />
@@ -586,7 +589,16 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
 
       {/* Question Modal */}
       {showQuestionModal && (
-        <QuestionModal studentId={id} studentName={student?.name || ''} onClose={() => { setShowQuestionModal(false); loadData(); }} />
+        <QuestionModal studentId={id} studentName={student?.name || ''} onClose={(newQuestion?) => { 
+          setShowQuestionModal(false);
+          if (newQuestion) {
+            // Optimistic update: add new question immediately to local state
+            setQuestions(prev => [newQuestion, ...prev]);
+            setToast({ message: '提問已送出！', type: 'success' });
+          }
+          // Still call loadData to sync with server
+          loadData(); 
+        }} />
       )}
 
       {/* Bottom Nav */}
@@ -612,7 +624,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
 // ─── Trade Modal — low friction, smart defaults ───
 function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
   studentId: string; defaultSymbol: string; defaultMarket: 'US' | 'TW';
-  onClose: (saved?: boolean) => void;
+  onClose: (saved?: boolean, newTrade?: Trade) => void;
 }) {
   const [tab, setTab] = useState<'screenshot' | 'manual'>('manual');
   const [ocrText, setOcrText] = useState('');
@@ -700,8 +712,9 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
         alert(error.error || '儲存失敗，請重試');
         return;
       }
+      const savedTrade = await response.json();
       setSuccess(true);
-      setTimeout(() => onClose(true), 800);
+      setTimeout(() => onClose(true, savedTrade), 800);
     } catch (err) {
       console.error('Save trade error:', err);
       alert('網路錯誤，請檢查連線後重試');
@@ -860,7 +873,7 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
 }
 
 // ─── Question Modal — warm, encouraging ───
-function QuestionModal({ studentId, studentName, onClose }: { studentId: string; studentName: string; onClose: () => void }) {
+function QuestionModal({ studentId, studentName, onClose }: { studentId: string; studentName: string; onClose: (newQuestion?: Question) => void }) {
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('other');
   const [saving, setSaving] = useState(false);
@@ -885,11 +898,16 @@ function QuestionModal({ studentId, studentName, onClose }: { studentId: string;
     if (!content.trim()) return;
     setSaving(true);
     try {
-      await fetch('/api/questions', {
+      const response = await fetch('/api/questions', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId, studentName, content, category }),
       });
-      onClose();
+      if (response.ok) {
+        const savedQuestion = await response.json();
+        onClose(savedQuestion.question);
+      } else {
+        onClose();
+      }
     } finally { setSaving(false); }
   }
 
@@ -906,7 +924,7 @@ function QuestionModal({ studentId, studentName, onClose }: { studentId: string;
       <div className="w-full max-w-lg bg-[var(--navy-light)] rounded-t-3xl md:rounded-3xl animate-slide-up">
         <div className="flex items-center justify-between p-5 border-b border-[var(--border)]">
           <h2 className="text-lg font-bold">有什麼想法？</h2>
-          <button onClick={onClose}><XIcon className="w-5 h-5 text-[var(--text-tertiary)]" /></button>
+          <button onClick={() => onClose()}><XIcon className="w-5 h-5 text-[var(--text-tertiary)]" /></button>
         </div>
         <div className="p-5 space-y-4">
           {/* Quick question templates */}
