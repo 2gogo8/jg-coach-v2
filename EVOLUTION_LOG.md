@@ -128,3 +128,57 @@ Prioritized 3 improvements from "What's Next" list:
 - Add "hot stocks" widget showing most-traded symbols today
 - Improve mobile responsiveness for trade modal
 - Add bulk trade import from CSV
+
+---
+
+### Round 3 (2026/02/22 05:00 → 05:30 Taipei)
+
+**Bug Fix Mission:**
+Identified and fixed critical bug from Round 1-2: stock validation and price auto-fill were not working in production.
+
+**Root Cause:**
+Quick symbol button onClick had React state timing issue:
+```javascript
+onClick={() => {
+  setSymbol(sym);
+  setTimeout(() => fetchStockPrice(), 100); // ❌ symbol state not updated yet!
+}}
+```
+The `fetchStockPrice()` function reads the `symbol` state, but `setSymbol()` is async, causing validation to fail.
+
+**Fix Implemented:**
+1. **Modified `fetchStockPrice` to accept optional parameter:**
+   - `async function fetchStockPrice(symbolOverride?: string)`
+   - Uses `symbolOverride || symbol` to get target symbol
+   - Resets validation state before API call
+   - Smart price auto-fill: always fill when quick button clicked, only fill empty field on manual input
+
+2. **Updated quick button onClick:**
+   ```javascript
+   onClick={() => {
+     setSymbol(sym);
+     fetchStockPrice(sym); // ✅ Pass symbol directly, no timing issue
+   }}
+   ```
+
+**Production Verification:**
+- ✅ AAPL quick button: "✓ Apple Inc. ▲ $4.00", price auto-filled $264.58
+- ✅ Manual TSLA input: "✓ Tesla, Inc. ▲ $0.11", validation works on blur
+- ✅ Green/red price change indicators working correctly
+- ✅ Toast notifications appear after trade save
+
+**Technical Details:**
+- Commit: `e14078a` (feat(evolution-3): fix stock validation & price auto-fill)
+- Files changed: 1 (app/student/[id]/page.tsx)
+- Lines modified: ~15
+- Build time: ~14s (Turbopack)
+- TypeScript compilation: ✅ No errors
+
+**Impact:**
+🎯 **Core UX restored** — Students can now easily validate stocks and get instant price fill, making trade recording truly "超簡單" as intended.
+
+**What's Next (Round 4 ideas):**
+- Clear price field when switching symbols (edge case: AAPL $264 → TSLA should clear price)
+- Add percentage change option (currently shows absolute $ change for some stocks)
+- Implement voice input for trade notes (microphone button exists but not wired)
+- Add keyboard shortcuts (Enter to submit, Esc to close modal)
