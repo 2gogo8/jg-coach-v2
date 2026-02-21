@@ -3,7 +3,7 @@ export function getAuth(): { role: 'admin' | 'student' | null; studentId?: strin
   if (typeof document === 'undefined') return { role: null };
   const cookie = document.cookie.split('; ').find(c => c.startsWith('jg_auth='));
   if (!cookie) return { role: null };
-  const val = cookie.split('=')[1];
+  const val = decodeURIComponent(cookie.split('=')[1]);
   if (val === 'admin') return { role: 'admin' };
   if (val.startsWith('student:')) return { role: 'student', studentId: val.split(':')[1] };
   return { role: null };
