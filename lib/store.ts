@@ -1,42 +1,59 @@
-// Persistent file-based store for Vercel serverless
-// Data persists within the same instance lifetime (~5-15min)
-// Will migrate to Supabase for production
+// Persistent Vercel Blob-based store for JG Coach V2
+// Data persists across serverless cold starts
 
-import fs from 'fs';
-import path from 'path';
+import { put, list } from '@vercel/blob';
 
-const STORE_PATH = path.join(process.cwd(), '.data', 'store.json');
+const BLOB_KEY = 'store/data.json';
+const CACHE_TTL_MS = 30000; // 30 seconds
 
-// Ensure data directory exists
-function ensureDataDir() {
-  const dir = path.dirname(STORE_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+// In-memory cache to avoid excessive blob reads
+let cachedStore: StoreData | null = null;
+let cacheTimestamp = 0;
+
+// Load store from Vercel Blob (with cache)
+async function loadStore(): Promise<StoreData> {
+  const now = Date.now();
+  
+  // Return cached data if still valid
+  if (cachedStore && (now - cacheTimestamp) < CACHE_TTL_MS) {
+    return cachedStore;
   }
-}
 
-// Load store from file
-function loadStore(): StoreData {
   try {
-    if (fs.existsSync(STORE_PATH)) {
-      const data = fs.readFileSync(STORE_PATH, 'utf-8');
-      const parsed = JSON.parse(data);
+    // Try to fetch existing blob
+    const { blobs } = await list({ prefix: BLOB_KEY, limit: 1 });
+    
+    if (blobs.length > 0) {
+      const response = await fetch(blobs[0].url);
+      const data = await response.json();
+      
       // Restore Map from object
-      if (parsed.students) {
-        parsed.students = new Map(Object.entries(parsed.students));
+      if (data.students) {
+        data.students = new Map(Object.entries(data.students));
       }
-      return parsed;
+      
+      cachedStore = data;
+      cacheTimestamp = now;
+      return data;
     }
   } catch (err) {
-    console.error('Failed to load store:', err);
+    console.error('Failed to load store from Blob:', err);
   }
-  return getDefaultStore();
+  
+  // If blob doesn't exist or error, initialize with seed data
+  const defaultStore = getDefaultStore();
+  cachedStore = defaultStore;
+  cacheTimestamp = now;
+  
+  // Save the initial data to blob
+  await saveStore();
+  
+  return defaultStore;
 }
 
-// Save store to file
-function saveStore() {
+// Save store to Vercel Blob
+async function saveStore() {
   try {
-    ensureDataDir();
     const data: any = {
       students: Object.fromEntries(students),
       trades,
@@ -45,9 +62,26 @@ function saveStore() {
       weeklyDirection,
       stockQueries,
     };
-    fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    
+    const blob = await put(BLOB_KEY, JSON.stringify(data, null, 2), {
+      access: 'public',
+      addRandomSuffix: false,
+    });
+    
+    // Update cache
+    cachedStore = {
+      students: new Map(Object.entries(data.students)),
+      trades: data.trades,
+      questions: data.questions,
+      insights: data.insights,
+      weeklyDirection: data.weeklyDirection,
+      stockQueries: data.stockQueries,
+    };
+    cacheTimestamp = Date.now();
+    
+    console.log('Store saved to Blob:', blob.url);
   } catch (err) {
-    console.error('Failed to save store:', err);
+    console.error('Failed to save store to Blob:', err);
   }
 }
 
@@ -345,47 +379,69 @@ function updateStreak(student: Student): boolean {
   return student.streak > 1; // true if streak continues
 }
 
-// ─── Storage ─── Load persistent data from file
-const storeData = loadStore();
-let students = storeData.students;
-let trades = storeData.trades;
-let questions = storeData.questions;
-let insights = storeData.insights;
-let weeklyDirection = storeData.weeklyDirection;
-let stockQueries = storeData.stockQueries;
+// ─── Storage ─── Initialize store (async loaded on first access)
+let students: Map<string, Student>;
+let trades: TradeEntry[];
+let questions: Question[];
+let insights: Insight[];
+let weeklyDirection: WeeklyDirection | null;
+let stockQueries: StockQuery[];
+
+// Initialize data on module load
+let initPromise: Promise<void> | null = null;
+
+async function ensureStoreLoaded(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      const storeData = await loadStore();
+      students = storeData.students;
+      trades = storeData.trades;
+      questions = storeData.questions;
+      insights = storeData.insights;
+      weeklyDirection = storeData.weeklyDirection;
+      stockQueries = storeData.stockQueries;
+    })();
+  }
+  await initPromise;
+}
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
 // ─── Students ───
-export function addStudent(data: Omit<Student, 'id' | 'createdAt' | 'xp' | 'level' | 'badges' | 'streak' | 'lastActiveDate'>): Student {
+export async function addStudent(data: Omit<Student, 'id' | 'createdAt' | 'xp' | 'level' | 'badges' | 'streak' | 'lastActiveDate'>): Promise<Student> {
+  await ensureStoreLoaded();
   const student: Student = { ...data, id: genId(), xp: 0, level: 1, badges: [], streak: 0, lastActiveDate: '', createdAt: new Date().toISOString() };
   students.set(student.id, student);
-  saveStore();
+  await saveStore();
   return student;
 }
 
-export function getStudent(id: string): Student | undefined {
+export async function getStudent(id: string): Promise<Student | undefined> {
+  await ensureStoreLoaded();
   return students.get(id);
 }
 
-export function updateStudent(id: string, patch: Partial<Student>): Student | null {
+export async function updateStudent(id: string, patch: Partial<Student>): Promise<Student | null> {
+  await ensureStoreLoaded();
   const s = students.get(id);
   if (!s) return null;
   const updated = { ...s, ...patch, id: s.id, createdAt: s.createdAt };
   students.set(id, updated);
-  saveStore();
+  await saveStore();
   return updated;
 }
 
-export function getAllStudents(): Student[] {
+export async function getAllStudents(): Promise<Student[]> {
+  await ensureStoreLoaded();
   return [...students.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function searchStudents(query: string): Student[] {
+export async function searchStudents(query: string): Promise<Student[]> {
+  await ensureStoreLoaded();
   const q = query.toLowerCase();
-  return getAllStudents().filter(s =>
+  return (await getAllStudents()).filter(s =>
     s.name.toLowerCase().includes(q) ||
     s.tags.some(t => t.includes(q)) ||
     s.style.includes(q)
@@ -393,7 +449,8 @@ export function searchStudents(query: string): Student[] {
 }
 
 // ─── Trades (with XP) ───
-export function addTrade(data: Omit<TradeEntry, 'id' | 'createdAt'>): { trade: TradeEntry; xpResult?: ReturnType<typeof awardXp> } {
+export async function addTrade(data: Omit<TradeEntry, 'id' | 'createdAt'>): Promise<{ trade: TradeEntry; xpResult?: ReturnType<typeof awardXp> }> {
+  await ensureStoreLoaded();
   const trade: TradeEntry = { ...data, id: genId(), createdAt: new Date().toISOString() };
   trades.unshift(trade);
   const student = students.get(data.studentId);
@@ -405,25 +462,28 @@ export function addTrade(data: Omit<TradeEntry, 'id' | 'createdAt'>): { trade: T
     if (streakContinued && student.streak > 1) xpAmount += 20; // streak bonus
     xpResult = awardXp(student, xpAmount);
   }
-  saveStore();
+  await saveStore();
   return { trade, xpResult };
 }
 
 // Backward compat: some API routes expect just TradeEntry
-export function addTradeCompat(data: Omit<TradeEntry, 'id' | 'createdAt'>): TradeEntry {
-  return addTrade(data).trade;
+export async function addTradeCompat(data: Omit<TradeEntry, 'id' | 'createdAt'>): Promise<TradeEntry> {
+  return (await addTrade(data)).trade;
 }
 
-export function getTradesByStudent(studentId: string): TradeEntry[] {
+export async function getTradesByStudent(studentId: string): Promise<TradeEntry[]> {
+  await ensureStoreLoaded();
   return trades.filter(t => t.studentId === studentId);
 }
 
-export function getAllTrades(): TradeEntry[] {
+export async function getAllTrades(): Promise<TradeEntry[]> {
+  await ensureStoreLoaded();
   return trades;
 }
 
 // ─── Questions (with XP) ───
-export function addQuestion(data: Omit<Question, 'id' | 'createdAt'>): { question: Question; xpResult?: ReturnType<typeof awardXp> } {
+export async function addQuestion(data: Omit<Question, 'id' | 'createdAt'>): Promise<{ question: Question; xpResult?: ReturnType<typeof awardXp> }> {
+  await ensureStoreLoaded();
   const q: Question = { ...data, id: genId(), createdAt: new Date().toISOString() };
   questions.unshift(q);
   const student = students.get(data.studentId);
@@ -431,11 +491,12 @@ export function addQuestion(data: Omit<Question, 'id' | 'createdAt'>): { questio
   if (student) {
     xpResult = awardXp(student, 5);
   }
-  saveStore();
+  await saveStore();
   return { question: q, xpResult };
 }
 
-export function answerQuestion(id: string, answer: string, by: 'jg' | 'ai'): { question: Question | null; xpResult?: ReturnType<typeof awardXp> } {
+export async function answerQuestion(id: string, answer: string, by: 'jg' | 'ai'): Promise<{ question: Question | null; xpResult?: ReturnType<typeof awardXp> }> {
+  await ensureStoreLoaded();
   const q = questions.find(q => q.id === id);
   if (!q) return { question: null };
   q.answer = answer;
@@ -449,23 +510,28 @@ export function answerQuestion(id: string, answer: string, by: 'jg' | 'ai'): { q
       xpResult = awardXp(student, 15);
     }
   }
+  await saveStore();
   return { question: q, xpResult };
 }
 
-export function getQuestionsByStudent(studentId: string): Question[] {
+export async function getQuestionsByStudent(studentId: string): Promise<Question[]> {
+  await ensureStoreLoaded();
   return questions.filter(q => q.studentId === studentId);
 }
 
-export function getAllQuestions(): Question[] {
+export async function getAllQuestions(): Promise<Question[]> {
+  await ensureStoreLoaded();
   return questions;
 }
 
-export function getUnansweredQuestions(): Question[] {
+export async function getUnansweredQuestions(): Promise<Question[]> {
+  await ensureStoreLoaded();
   return questions.filter(q => !q.answer);
 }
 
 // ─── Weekly Direction ───
-export function setWeeklyDirection(content: string): WeeklyDirection {
+export async function setWeeklyDirection(content: string): Promise<WeeklyDirection> {
+  await ensureStoreLoaded();
   const now = new Date();
   const day = now.getDay();
   const monday = new Date(now);
@@ -476,15 +542,18 @@ export function setWeeklyDirection(content: string): WeeklyDirection {
     content,
     createdAt: new Date().toISOString(),
   };
+  await saveStore();
   return weeklyDirection;
 }
 
-export function getWeeklyDirection(): WeeklyDirection | null {
+export async function getWeeklyDirection(): Promise<WeeklyDirection | null> {
+  await ensureStoreLoaded();
   return weeklyDirection;
 }
 
 // ─── Insights ───
-export function addInsight(data: { content: string; tickers?: string[]; category?: Insight['category'] }): Insight {
+export async function addInsight(data: { content: string; tickers?: string[]; category?: Insight['category'] }): Promise<Insight> {
+  await ensureStoreLoaded();
   const tickers = data.tickers && data.tickers.length > 0
     ? data.tickers
     : extractTickers(data.content);
@@ -496,17 +565,21 @@ export function addInsight(data: { content: string; tickers?: string[]; category
     createdAt: new Date().toISOString(),
   };
   insights.unshift(insight);
+  await saveStore();
   return insight;
 }
 
-export function getInsights(limit = 50): Insight[] {
+export async function getInsights(limit = 50): Promise<Insight[]> {
+  await ensureStoreLoaded();
   return insights.slice(0, limit);
 }
 
-export function deleteInsight(id: string): boolean {
+export async function deleteInsight(id: string): Promise<boolean> {
+  await ensureStoreLoaded();
   const idx = insights.findIndex(i => i.id === id);
   if (idx === -1) return false;
   insights.splice(idx, 1);
+  await saveStore();
   return true;
 }
 
@@ -517,18 +590,22 @@ function extractTickers(text: string): string[] {
 }
 
 // ─── Stock Queries (with XP) ───
-export function addStockQuery(data: { studentId: string; studentName: string; symbol: string }): StockQuery {
+export async function addStockQuery(data: { studentId: string; studentName: string; symbol: string }): Promise<StockQuery> {
+  await ensureStoreLoaded();
   const q: StockQuery = { ...data, id: genId(), symbol: data.symbol.toUpperCase(), createdAt: new Date().toISOString() };
   stockQueries.unshift(q);
+  await saveStore();
   return q;
 }
 
-export function getStockQueries(studentId?: string): StockQuery[] {
+export async function getStockQueries(studentId?: string): Promise<StockQuery[]> {
+  await ensureStoreLoaded();
   if (studentId) return stockQueries.filter(q => q.studentId === studentId);
   return stockQueries;
 }
 
-export function getStockQueryStats(): { symbol: string; count: number; lastQueried: string }[] {
+export async function getStockQueryStats(): Promise<{ symbol: string; count: number; lastQueried: string }[]> {
+  await ensureStoreLoaded();
   const map = new Map<string, { count: number; lastQueried: string }>();
   for (const q of stockQueries) {
     const existing = map.get(q.symbol);
@@ -545,7 +622,8 @@ export function getStockQueryStats(): { symbol: string; count: number; lastQueri
 }
 
 // ─── Daily Missions ───
-export function getDailyMissions(studentId: string): { id: string; label: string; done: boolean }[] {
+export async function getDailyMissions(studentId: string): Promise<{ id: string; label: string; done: boolean }[]> {
+  await ensureStoreLoaded();
   const today = new Date().toISOString().split('T')[0];
   const todayTrades = trades.filter(t => t.studentId === studentId && t.date === today);
   const todayQs = questions.filter(q => q.studentId === studentId && q.createdAt.startsWith(today));
@@ -558,8 +636,9 @@ export function getDailyMissions(studentId: string): { id: string; label: string
 }
 
 // ─── Leaderboard ───
-export function getLeaderboard(): { rank: number; name: string; xp: number; level: number; title: string; streak: number; isTopWeekly: boolean }[] {
-  const all = getAllStudents();
+export async function getLeaderboard(): Promise<{ rank: number; name: string; xp: number; level: number; title: string; streak: number; isTopWeekly: boolean }[]> {
+  await ensureStoreLoaded();
+  const all = await getAllStudents();
   const sorted = all.sort((a, b) => b.xp - a.xp);
   return sorted.map((s, i) => {
     const info = getLevelInfo(s.xp);
@@ -576,9 +655,10 @@ export function getLeaderboard(): { rank: number; name: string; xp: number; leve
 }
 
 // ─── Analytics ───
-export function getStudentAnalytics(studentId: string) {
-  const studentTrades = getTradesByStudent(studentId);
-  const studentQuestions = getQuestionsByStudent(studentId);
+export async function getStudentAnalytics(studentId: string) {
+  await ensureStoreLoaded();
+  const studentTrades = await getTradesByStudent(studentId);
+  const studentQuestions = await getQuestionsByStudent(studentId);
 
   if (studentTrades.length === 0) {
     return { totalTrades: 0, buys: 0, sells: 0, symbols: [], questionCount: studentQuestions.length, needsHelp: [] };

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     imageBase64 = `data:${imageFile.type};base64,${Buffer.from(buffer).toString('base64')}`;
   }
 
-  const { trade, xpResult } = addTrade({
+  const { trade, xpResult } = await addTrade({
     studentId,
     symbol: symbol.toUpperCase(),
     market: market as 'US' | 'TW',

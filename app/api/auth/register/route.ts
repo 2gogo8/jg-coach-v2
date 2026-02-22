@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '請輸入姓名' }, { status: 400 });
   }
 
-  const student = addStudent({
+  const student = await addStudent({
     name: name.trim(),
     joinDate: new Date().toISOString().split('T')[0],
     experience: 'beginner',

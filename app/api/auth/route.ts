@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   }
 
   // Student login by their ID
-  const students = getAllStudents();
+  const students = await getAllStudents();
   const student = students.find(s => s.id === code);
   if (student) {
     const res = NextResponse.json({ ok: true, role: 'student', studentId: student.id, name: student.name });

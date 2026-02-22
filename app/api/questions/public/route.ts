@@ -36,7 +36,7 @@ const CATEGORY_SOLUTIONS: Record<string, string> = {
 
 export async function GET() {
   try {
-    const allQuestions = getAllQuestions();
+    const allQuestions = await getAllQuestions();
     
     // Get questions from this week
     const now = new Date();
