@@ -38,6 +38,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
   const [marketIndices, setMarketIndices] = useState<Array<{ name: string; symbol: string; price: number; change: number; changesPercentage: number | null }>>([]);
   const [askTab, setAskTab] = useState<AskTab>('mine');
   const [publicQuestions, setPublicQuestions] = useState<PublicQuestionsData | null>(null);
+  const [showDataWarning, setShowDataWarning] = useState(true);
 
   const loadData = useCallback(async () => {
     try {
@@ -178,6 +179,26 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
 
       {activeTab === 'home' && (
         <div className="px-5 py-4 space-y-5 animate-fade-in">
+          {/* Data persistence warning */}
+          {showDataWarning && (
+            <div className="glass rounded-2xl p-4 border border-amber-500/20 bg-amber-500/5 animate-fade-in">
+              <div className="flex items-start gap-3">
+                <span className="text-amber-400 text-lg">⚠️</span>
+                <div className="flex-1">
+                  <p className="text-sm text-amber-400 font-medium mb-1">實驗室階段提醒</p>
+                  <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-2">
+                    目前資料儲存在記憶體中，可能在系統重啟後遺失。正式版將使用資料庫保存所有紀錄。
+                  </p>
+                  <button
+                    onClick={() => setShowDataWarning(false)}
+                    className="text-xs text-amber-400 hover:text-amber-300 underline"
+                  >
+                    知道了
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Greeting + social proof */}
           <div>
             {socialProof.todayActive > 0 && (
@@ -798,7 +819,16 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
                         <option value="TW">台股</option>
                       </select>
                     </div>
-                    {stockName && (
+                    {priceLoading && (
+                      <div className="flex items-center gap-2 px-1">
+                        <svg className="animate-spin h-3.5 w-3.5 text-[var(--blue)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p className="text-xs text-[var(--text-tertiary)]">驗證中...</p>
+                      </div>
+                    )}
+                    {!priceLoading && stockName && (
                       <div className="flex items-center gap-2 px-1">
                         <p className="text-xs text-green-400">✓ {stockName}</p>
                         {priceChange !== null && priceChangePercent !== null && (
@@ -817,7 +847,7 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
                         )}
                       </div>
                     )}
-                    {symbolValid === false && (
+                    {!priceLoading && symbolValid === false && (
                       <p className="text-xs text-red-400 px-1">找不到此股票代號</p>
                     )}
                     {/* Quick symbol suggestions */}
@@ -930,13 +960,15 @@ function QuestionModal({ studentId, studentName, onClose }: { studentId: string;
           {/* Quick question templates */}
           {!content && (
             <div className="space-y-2">
-              <p className="text-xs text-[var(--text-tertiary)] px-1">或者選一個快速開始：</p>
+              <p className="text-xs text-[var(--text-tertiary)] px-1">快速開始（點擊一鍵填入）：</p>
               <div className="flex flex-wrap gap-1.5">
                 {[
                   '這支股票現在適合買嗎？',
                   '我該停損嗎？',
                   '如何判斷進場時機？',
-                  '這個技術型態是什麼意思？',
+                  '這個技術型態怎麼看？',
+                  '該加碼還是減碼？',
+                  '如何設定停損點？',
                 ].map(template => (
                   <button
                     key={template}
