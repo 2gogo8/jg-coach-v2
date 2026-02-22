@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getAuth, logout } from '@/lib/auth';
 import { Toast } from '@/lib/toast';
 import {
@@ -39,6 +40,11 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
   const [askTab, setAskTab] = useState<AskTab>('mine');
   const [publicQuestions, setPublicQuestions] = useState<PublicQuestionsData | null>(null);
   const [showDataWarning, setShowDataWarning] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [quickAskOpen, setQuickAskOpen] = useState(false);
+  const [quickAskText, setQuickAskText] = useState('');
+  const [quickAskSaving, setQuickAskSaving] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -89,7 +95,10 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
     const auth = getAuth();
     if (!auth.role) { router.replace('/auth'); return; }
     loadData();
-  }, [router, loadData]);
+    // Check if first visit for onboarding
+    const onboardingSeen = localStorage.getItem(`jg-onboarding-${id}`);
+    if (!onboardingSeen) setShowOnboarding(true);
+  }, [router, loadData, id]);
 
   // Streak message
   const streakMsg = (() => {
@@ -224,13 +233,36 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
             )}
           </div>
 
-          {/* Quick action — one tap to record */}
-          <button
-            onClick={() => setShowTradeModal(true)}
-            className="w-full py-4 rounded-2xl bg-[var(--blue-soft)] border border-[var(--blue)]/20 text-[var(--blue-light)] text-base font-medium hover:bg-[var(--blue)]/20 transition-all active:scale-[0.98]"
-          >
-            今天交易了什麼？
-          </button>
+          {/* Quick actions — two taps */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowTradeModal(true)}
+              className="flex-1 py-4 rounded-2xl bg-[var(--blue-soft)] border border-[var(--blue)]/20 text-[var(--blue-light)] text-base font-medium hover:bg-[var(--blue)]/20 transition-all active:scale-[0.98]"
+            >
+              📝 記錄交易
+            </button>
+            <button
+              onClick={() => setQuickAskOpen(true)}
+              className="flex-1 py-4 rounded-2xl bg-[var(--green-soft)] border border-[var(--green)]/20 text-green-400 text-base font-medium hover:bg-[var(--green)]/20 transition-all active:scale-[0.98]"
+            >
+              💬 問 JG
+            </button>
+          </div>
+
+          {/* Contextual reflection prompt — after recent sells */}
+          {(() => {
+            const recentSell = trades.find(t => t.action === 'sell' && !questions.some(q => q.content.includes(t.symbol) && new Date(q.createdAt) > new Date(t.createdAt)));
+            if (!recentSell) return null;
+            return (
+              <button
+                onClick={() => { setQuickAskText(`我剛賣了 ${recentSell.symbol}，這個操作做對了嗎？`); setQuickAskOpen(true); }}
+                className="w-full p-3 rounded-2xl bg-[var(--amber-soft)] border border-[var(--amber)]/10 text-left hover:bg-[var(--amber)]/10 transition-all"
+              >
+                <p className="text-xs text-[var(--amber)] font-medium mb-0.5">💡 覆盤建議</p>
+                <p className="text-sm text-[var(--text-secondary)]">你剛賣了 <span className="font-semibold">{recentSell.symbol}</span>，要不要問問 JG 這筆操作？</p>
+              </button>
+            );
+          })()}
 
           {/* Market Overview */}
           <div className="glass rounded-2xl p-4">
@@ -329,15 +361,38 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
                 </div>
               ))}
               {activities.length === 0 && (
-                <div className="text-center py-16 text-[var(--text-tertiary)]">
-                  <p className="text-base mb-2">還沒有紀錄</p>
-                  <p className="text-sm mb-4">開始你的交易日記，追蹤每一次成長</p>
-                  <button
-                    onClick={() => setShowTradeModal(true)}
-                    className="px-5 py-2 rounded-xl bg-[var(--blue-soft)] text-[var(--blue)] text-sm font-medium hover:bg-[var(--blue)]/20 transition-all"
-                  >
-                    記錄第一筆交易
-                  </button>
+                <div className="space-y-4 py-8">
+                  <div className="text-center mb-6">
+                    <p className="text-3xl mb-3">🌱</p>
+                    <p className="text-base font-medium mb-1">你的旅程從這裡開始</p>
+                    <p className="text-sm text-[var(--text-tertiary)]">每一步都算數</p>
+                  </div>
+                  <div className="space-y-2">
+                    <button onClick={() => setShowTradeModal(true)}
+                      className="w-full p-4 rounded-2xl bg-[var(--blue-soft)] border border-[var(--blue)]/10 text-left flex items-center gap-3 hover:bg-[var(--blue)]/15 transition-all">
+                      <span className="text-2xl">📝</span>
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--blue-light)]">記錄第一筆交易</p>
+                        <p className="text-xs text-[var(--text-tertiary)]">不管賺賠，記錄就是進步</p>
+                      </div>
+                    </button>
+                    <button onClick={() => setQuickAskOpen(true)}
+                      className="w-full p-4 rounded-2xl bg-[var(--green-soft)] border border-[var(--green)]/10 text-left flex items-center gap-3 hover:bg-[var(--green)]/15 transition-all">
+                      <span className="text-2xl">💬</span>
+                      <div>
+                        <p className="text-sm font-semibold text-green-400">問 JG 一個問題</p>
+                        <p className="text-xs text-[var(--text-tertiary)]">不懂就問，不丟臉</p>
+                      </div>
+                    </button>
+                    <button onClick={() => { setActiveTab('ask'); setAskTab('public'); }}
+                      className="w-full p-4 rounded-2xl bg-[var(--navy-lighter)] border border-[var(--border)] text-left flex items-center gap-3 hover:bg-[var(--navy-light)] transition-all">
+                      <span className="text-2xl">👀</span>
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--text-secondary)]">看看別人在問什麼</p>
+                        <p className="text-xs text-[var(--text-tertiary)]">社群的力量，一起成長</p>
+                      </div>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -600,9 +655,172 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
             </div>
           </div>
 
+          {/* Guide Link */}
+          <Link 
+            href="/guide"
+            className="w-full py-3 rounded-2xl border border-[var(--blue)]/30 bg-[var(--blue-soft)] text-[var(--blue)] text-center font-medium hover:bg-[var(--blue)]/20 transition-all flex items-center justify-center gap-2"
+          >
+            <span>📖</span>
+            <span>如何使用</span>
+          </Link>
+
           <button onClick={logout} className="w-full py-3 rounded-2xl border border-[var(--border)] text-[var(--text-tertiary)] hover:text-[var(--red)] hover:border-[var(--red)]/30 transition-colors">
             登出
           </button>
+        </div>
+      )}
+
+      {/* Onboarding Overlay */}
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[60] overlay-bg flex items-center justify-center px-6">
+          <div className="w-full max-w-md bg-[var(--navy-light)] rounded-3xl p-6 animate-slide-up">
+            {onboardingStep === 0 && (
+              <div className="text-center space-y-4">
+                <div className="text-5xl">👋</div>
+                <h2 className="text-2xl font-bold">歡迎來到 JG 實驗室</h2>
+                <p className="text-[var(--text-secondary)] leading-relaxed">
+                  這裡是你的專屬交易成長空間。<br/>JG 會在這裡給你方向指引、回覆你的問題。
+                </p>
+                <button onClick={() => setOnboardingStep(1)} className="w-full py-3 rounded-2xl bg-[var(--blue)] text-white font-semibold">
+                  了解一下 →
+                </button>
+              </div>
+            )}
+            {onboardingStep === 1 && (
+              <div className="space-y-5">
+                <h2 className="text-xl font-bold text-center">三件事，開始你的旅程</h2>
+                <div className="space-y-3">
+                  {[
+                    { emoji: '📝', title: '記錄交易', desc: '每次買賣都記下來，養成紀律' },
+                    { emoji: '💬', title: '隨時提問', desc: '不懂就問，JG 和社群會幫你' },
+                    { emoji: '📊', title: '追蹤成長', desc: '看見自己的進步，越來越有信心' },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-[var(--navy-lighter)]">
+                      <span className="text-2xl">{item.emoji}</span>
+                      <div>
+                        <p className="font-semibold text-sm">{item.title}</p>
+                        <p className="text-xs text-[var(--text-tertiary)]">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setOnboardingStep(2)} className="w-full py-3 rounded-2xl bg-[var(--blue)] text-white font-semibold">
+                  繼續 →
+                </button>
+              </div>
+            )}
+            {onboardingStep === 2 && (
+              <div className="text-center space-y-4">
+                <div className="text-5xl">🚀</div>
+                <h2 className="text-xl font-bold">準備好了！</h2>
+                <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
+                  建議你先做第一件事：<br/>
+                  <span className="text-[var(--blue)] font-medium">記錄一筆交易</span>或<span className="text-green-400 font-medium">問一個問題</span>
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowOnboarding(false);
+                      localStorage.setItem(`jg-onboarding-${id}`, '1');
+                      setShowTradeModal(true);
+                    }}
+                    className="flex-1 py-3 rounded-2xl bg-[var(--blue-soft)] text-[var(--blue)] font-semibold border border-[var(--blue)]/20"
+                  >
+                    📝 記錄交易
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowOnboarding(false);
+                      localStorage.setItem(`jg-onboarding-${id}`, '1');
+                      setShowQuestionModal(true);
+                    }}
+                    className="flex-1 py-3 rounded-2xl bg-[var(--green-soft)] text-green-400 font-semibold border border-[var(--green)]/20"
+                  >
+                    💬 提問
+                  </button>
+                </div>
+                <button
+                  onClick={() => { setShowOnboarding(false); localStorage.setItem(`jg-onboarding-${id}`, '1'); }}
+                  className="text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                >
+                  先看看
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Ask FAB — floating on home tab */}
+      {activeTab === 'home' && !showTradeModal && !showQuestionModal && !showOnboarding && (
+        <button
+          onClick={() => setQuickAskOpen(true)}
+          className="fixed bottom-24 right-5 z-30 w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 flex items-center justify-center hover:scale-105 transition-transform active:scale-95"
+          title="快速提問"
+        >
+          <ChatIcon className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Quick Ask Popover */}
+      {quickAskOpen && (
+        <div className="fixed inset-0 z-50 overlay-bg flex items-end justify-center" onClick={e => e.target === e.currentTarget && setQuickAskOpen(false)}>
+          <div className="w-full max-w-lg bg-[var(--navy-light)] rounded-t-3xl animate-slide-up p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold">快速提問</h3>
+              <button onClick={() => setQuickAskOpen(false)}><XIcon className="w-5 h-5 text-[var(--text-tertiary)]" /></button>
+            </div>
+            {/* Contextual suggestions based on recent trades */}
+            {!quickAskText && trades.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {(() => {
+                  const recentSymbols = [...new Set(trades.slice(0, 5).map(t => t.symbol))].slice(0, 3);
+                  return recentSymbols.map(sym => (
+                    <button key={sym} onClick={() => setQuickAskText(`${sym} 現在適合操作嗎？`)}
+                      className="px-3 py-1.5 rounded-lg text-xs bg-[var(--blue-soft)] text-[var(--blue)] border border-[var(--blue)]/10">
+                      {sym} 怎麼看？
+                    </button>
+                  ));
+                })()}
+                <button onClick={() => setQuickAskText('今天盤勢怎麼看？')}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-[var(--navy-lighter)] text-[var(--text-secondary)]">
+                  今天盤勢？
+                </button>
+              </div>
+            )}
+            <textarea
+              value={quickAskText}
+              onChange={e => setQuickAskText(e.target.value)}
+              placeholder="想問什麼？"
+              rows={2}
+              className="w-full px-4 py-3 rounded-2xl bg-[var(--navy-lighter)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--blue)]/50 focus:outline-none resize-none"
+              autoFocus
+            />
+            <button
+              onClick={async () => {
+                if (!quickAskText.trim()) return;
+                setQuickAskSaving(true);
+                try {
+                  const res = await fetch('/api/questions', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ studentId: id, studentName: student?.name || '', content: quickAskText, category: 'other' }),
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    setQuestions(prev => [data.question, ...prev]);
+                    saveLocalQuestions(id, [data.question, ...questions]);
+                    setToast({ message: '提問已送出！', type: 'success' });
+                    setQuickAskText('');
+                    setQuickAskOpen(false);
+                  }
+                } finally { setQuickAskSaving(false); }
+              }}
+              disabled={quickAskSaving || !quickAskText.trim()}
+              className="w-full py-3 rounded-2xl bg-[var(--blue)] text-white font-semibold disabled:opacity-40"
+            >
+              {quickAskSaving ? '送出中...' : '送出'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -658,7 +876,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
           {([
             { tab: 'home' as const, icon: <HomeIcon className="w-6 h-6" />, label: '首頁' },
             { tab: 'record' as const, icon: <PencilIcon className="w-6 h-6" />, label: '紀錄' },
-            { tab: 'ask' as const, icon: <ChatIcon className="w-6 h-6" />, label: '想法' },
+            { tab: 'ask' as const, icon: <ChatIcon className="w-6 h-6" />, label: '提問' },
             { tab: 'me' as const, icon: <UserIcon className="w-6 h-6" />, label: '我的' },
           ]).map(item => (
             <button key={item.tab} onClick={() => setActiveTab(item.tab)} className={`flex-1 py-3 flex flex-col items-center gap-0.5 transition-colors ${activeTab === item.tab ? 'text-[var(--blue)]' : 'text-[var(--text-tertiary)]'}`}>
