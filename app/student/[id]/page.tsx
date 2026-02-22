@@ -604,7 +604,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
           studentId={id}
           defaultSymbol={lastSymbol}
           defaultMarket={lastMarket}
-          onClose={(saved, newTrade?) => {
+          onClose={(saved, newTrade) => {
             setShowTradeModal(false);
             if (saved && newTrade) { 
               // Optimistic update: add new trade immediately to local state
@@ -621,7 +621,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
 
       {/* Question Modal */}
       {showQuestionModal && (
-        <QuestionModal studentId={id} studentName={student?.name || ''} onClose={(newQuestion?) => { 
+        <QuestionModal studentId={id} studentName={student?.name || ''} onClose={(newQuestion) => { 
           setShowQuestionModal(false);
           if (newQuestion) {
             // Optimistic update: add new question immediately to local state
