@@ -23,13 +23,24 @@ export async function GET() {
     ].filter(idx => idx.data !== null);
 
     return NextResponse.json({
-      indices: indices.map(idx => ({
-        name: idx.name,
-        symbol: idx.symbol,
-        price: idx.data!.price,
-        change: idx.data!.change,
-        changesPercentage: idx.data!.changesPercentage,
-      })),
+      indices: indices.map(idx => {
+        const data = idx.data!;
+        // Calculate changesPercentage if FMP doesn't provide it
+        let pctChange = data.changesPercentage;
+        if (pctChange === null || pctChange === undefined) {
+          pctChange = data.previousClose > 0 
+            ? (data.change / data.previousClose) * 100 
+            : 0;
+        }
+        
+        return {
+          name: idx.name,
+          symbol: idx.symbol,
+          price: data.price,
+          change: data.change,
+          changesPercentage: pctChange,
+        };
+      }),
       updatedAt: new Date().toISOString(),
     });
   } catch (error) {

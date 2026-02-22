@@ -222,9 +222,18 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
           </button>
 
           {/* Market Overview */}
-          {marketIndices.length > 0 && (
-            <div className="glass rounded-2xl p-4">
-              <h3 className="text-sm font-medium text-[var(--text-tertiary)] mb-3">市場走勢</h3>
+          <div className="glass rounded-2xl p-4">
+            <h3 className="text-sm font-medium text-[var(--text-tertiary)] mb-3">市場走勢</h3>
+            {loading ? (
+              <div className="grid grid-cols-3 gap-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="text-center">
+                    <div className="h-3 bg-[var(--text-tertiary)]/10 rounded mb-2 w-12 mx-auto animate-pulse"></div>
+                    <div className="h-4 bg-[var(--text-tertiary)]/10 rounded w-16 mx-auto animate-pulse"></div>
+                  </div>
+                ))}
+              </div>
+            ) : marketIndices.length > 0 ? (
               <div className="grid grid-cols-3 gap-3">
                 {marketIndices.map(idx => (
                   <div key={idx.symbol} className="text-center">
@@ -240,8 +249,10 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-[var(--text-tertiary)] text-center">無法載入市場數據</p>
+            )}
+          </div>
 
           {/* Weekly Direction */}
           {direction && (
@@ -959,23 +970,24 @@ function QuestionModal({ studentId, studentName, onClose }: { studentId: string;
         <div className="p-5 space-y-4">
           {/* Quick question templates */}
           {!content && (
-            <div className="space-y-2">
-              <p className="text-xs text-[var(--text-tertiary)] px-1">快速開始（點擊一鍵填入）：</p>
-              <div className="flex flex-wrap gap-1.5">
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-[var(--text-secondary)] px-1">💡 快速開始（點擊一鍵填入）</p>
+              <div className="grid grid-cols-2 gap-2">
                 {[
-                  '這支股票現在適合買嗎？',
-                  '我該停損嗎？',
-                  '如何判斷進場時機？',
-                  '這個技術型態怎麼看？',
-                  '該加碼還是減碼？',
-                  '如何設定停損點？',
-                ].map(template => (
+                  { emoji: '🎯', text: '這支股票現在適合買嗎？' },
+                  { emoji: '✋', text: '我該停損嗎？' },
+                  { emoji: '⏰', text: '如何判斷進場時機？' },
+                  { emoji: '📊', text: '這個技術型態怎麼看？' },
+                  { emoji: '⚖️', text: '該加碼還是減碼？' },
+                  { emoji: '🛡️', text: '如何設定停損點？' },
+                ].map(({ emoji, text }) => (
                   <button
-                    key={template}
-                    onClick={() => setContent(template)}
-                    className="px-3 py-1.5 rounded-lg text-xs bg-[var(--navy-lighter)] text-[var(--text-secondary)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)] transition-all"
+                    key={text}
+                    onClick={() => setContent(text)}
+                    className="px-3 py-2.5 rounded-xl text-sm bg-gradient-to-br from-[var(--blue-soft)] to-[var(--navy-lighter)] text-[var(--text-secondary)] hover:from-[var(--blue)]/20 hover:to-[var(--blue-soft)] hover:text-[var(--blue-light)] transition-all border border-[var(--blue)]/10 hover:border-[var(--blue)]/30 text-left flex items-start gap-2"
                   >
-                    {template}
+                    <span className="text-base flex-shrink-0">{emoji}</span>
+                    <span className="leading-snug">{text}</span>
                   </button>
                 ))}
               </div>
