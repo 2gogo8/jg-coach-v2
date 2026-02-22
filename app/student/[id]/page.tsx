@@ -20,6 +20,36 @@ interface WeeklyDir { content: string; weekStart: string; }
 type BottomTab = 'home' | 'record' | 'ask' | 'me';
 type AskTab = 'mine' | 'public';
 
+// Helper: format relative time (e.g. "剛剛", "5 分鐘前", "今天 14:30")
+function formatRelativeTime(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHour = Math.floor(diffMin / 60);
+  
+  if (diffMin < 1) return '剛剛';
+  if (diffMin < 60) return `${diffMin} 分鐘前`;
+  if (diffHour < 6) return `${diffHour} 小時前`;
+  
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) {
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
+    return `今天 ${h}:${m}`;
+  }
+  
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
+    return `昨天 ${h}:${m}`;
+  }
+  
+  return date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
+}
+
 export default function StudentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -299,7 +329,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
                           </span>
                           <span className="font-semibold">{(a.data as Trade).symbol}</span>
                         </div>
-                        <span className="text-xs text-[var(--text-tertiary)]">{(a.data as Trade).date}</span>
+                        <span className="text-xs text-[var(--text-tertiary)]">{formatRelativeTime((a.data as Trade).createdAt)}</span>
                       </div>
                       <div className="text-sm text-[var(--text-secondary)]">${(a.data as Trade).price} × {(a.data as Trade).shares} 股</div>
                       {(a.data as Trade).note && <p className="text-xs text-[var(--text-tertiary)] mt-1.5">{(a.data as Trade).note}</p>}
@@ -308,7 +338,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
                     <div className={(a.data as Question).answeredBy === 'jg' ? 'warm-glow' : ''}>
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--blue-soft)] text-blue-400 font-medium">提問</span>
-                        <span className="text-xs text-[var(--text-tertiary)]">{new Date((a.data as Question).createdAt).toLocaleDateString('zh-TW')}</span>
+                        <span className="text-xs text-[var(--text-tertiary)]">{formatRelativeTime((a.data as Question).createdAt)}</span>
                       </div>
                       <p className="text-sm">{(a.data as Question).content}</p>
                       {(a.data as Question).answer && (
@@ -610,6 +640,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
           studentId={id}
           defaultSymbol={lastSymbol}
           defaultMarket={lastMarket}
+          recentSymbols={recentSymbols}
           onClose={(saved, newTrade) => {
             setShowTradeModal(false);
             if (saved && newTrade) { 
@@ -617,7 +648,14 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
               setTrades(prev => [newTrade, ...prev]);
               setJustSaved(true); 
               setToast({ message: '交易已記錄！', type: 'success' });
-              setTimeout(() => setJustSaved(false), 1200); 
+              setTimeout(() => setJustSaved(false), 1200);
+              
+              // Update recent symbols (keep last 8 unique symbols)
+              const updated = [newTrade.symbol, ...recentSymbols.filter(s => s !== newTrade.symbol)].slice(0, 8);
+              setRecentSymbols(updated);
+              try {
+                localStorage.setItem('jg-recent-symbols', JSON.stringify(updated));
+              } catch { /* ignore */ }
             }
             // Still call loadData to sync with server (in case data persists)
             loadData();
@@ -660,8 +698,8 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
 }
 
 // ─── Trade Modal — low friction, smart defaults ───
-function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
-  studentId: string; defaultSymbol: string; defaultMarket: 'US' | 'TW';
+function TradeModal({ studentId, defaultSymbol, defaultMarket, recentSymbols, onClose }: {
+  studentId: string; defaultSymbol: string; defaultMarket: 'US' | 'TW'; recentSymbols: string[];
   onClose: (saved?: boolean, newTrade?: Trade) => void;
 }) {
   const [tab, setTab] = useState<'screenshot' | 'manual'>('manual');
@@ -869,24 +907,47 @@ function TradeModal({ studentId, defaultSymbol, defaultMarket, onClose }: {
                     )}
                     {/* Quick symbol suggestions */}
                     {!symbol && (
-                      <div className="space-y-2">
-                        <p className="text-xs text-[var(--text-tertiary)] px-1">常用股票：</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(market === 'US' 
-                            ? ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL', 'AMZN']
-                            : ['2330', '2454', '2317', '2412', '2303', '2308']
-                          ).map(sym => (
-                            <button
-                              key={sym}
-                              onClick={() => {
-                                setSymbol(sym);
-                                fetchStockPrice(sym); // ✅ Pass symbol directly to avoid state timing issue
-                              }}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--navy-lighter)] text-[var(--text-secondary)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)] transition-all"
-                            >
-                              {sym}
-                            </button>
-                          ))}
+                      <div className="space-y-3">
+                        {/* Recent symbols (user's own trading history) */}
+                        {recentSymbols.length > 0 && (
+                          <div>
+                            <p className="text-xs text-[var(--blue-light)] px-1 mb-1.5">你最近交易：</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {recentSymbols.map(sym => (
+                                <button
+                                  key={sym}
+                                  onClick={() => {
+                                    setSymbol(sym);
+                                    fetchStockPrice(sym);
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--blue-soft)] text-[var(--blue)] hover:bg-[var(--blue)]/30 transition-all border border-[var(--blue)]/20"
+                                >
+                                  {sym}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Market popular symbols */}
+                        <div>
+                          <p className="text-xs text-[var(--text-tertiary)] px-1 mb-1.5">常用股票：</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(market === 'US' 
+                              ? ['AAPL', 'TSLA', 'NVDA', 'MSFT', 'GOOGL', 'AMZN']
+                              : ['2330', '2454', '2317', '2412', '2303', '2308']
+                            ).map(sym => (
+                              <button
+                                key={sym}
+                                onClick={() => {
+                                  setSymbol(sym);
+                                  fetchStockPrice(sym);
+                                }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--navy-lighter)] text-[var(--text-secondary)] hover:bg-[var(--blue-soft)] hover:text-[var(--blue)] transition-all"
+                              >
+                                {sym}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}
