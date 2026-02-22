@@ -612,9 +612,9 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
               setJustSaved(true); 
               setToast({ message: '交易已記錄！', type: 'success' });
               setTimeout(() => setJustSaved(false), 1200); 
+              // Delayed sync to avoid overwriting optimistic update with stale data
+              setTimeout(() => loadData(), 2000);
             }
-            // Still call loadData to sync with server (in case data persists)
-            loadData();
           }}
         />
       )}
@@ -627,9 +627,9 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
             // Optimistic update: add new question immediately to local state
             setQuestions(prev => [newQuestion, ...prev]);
             setToast({ message: '提問已送出！', type: 'success' });
+            // Delayed sync to avoid overwriting optimistic update with stale data
+            setTimeout(() => loadData(), 2000);
           }
-          // Still call loadData to sync with server
-          loadData(); 
         }} />
       )}
 
