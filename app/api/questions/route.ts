@@ -8,9 +8,9 @@ export async function GET(request: Request) {
   const studentId = searchParams.get('studentId');
   const unanswered = searchParams.get('unanswered');
 
-  if (unanswered === '1') return NextResponse.json(getUnansweredQuestions());
-  if (studentId) return NextResponse.json(getQuestionsByStudent(studentId));
-  return NextResponse.json(getAllQuestions());
+  if (unanswered === '1') return NextResponse.json(await getUnansweredQuestions());
+  if (studentId) return NextResponse.json(await getQuestionsByStudent(studentId));
+  return NextResponse.json(await getAllQuestions());
 }
 
 export async function POST(request: Request) {
@@ -19,6 +19,6 @@ export async function POST(request: Request) {
   if (!studentId || !content) {
     return NextResponse.json({ error: '缺少必要欄位' }, { status: 400 });
   }
-  const { question, xpResult } = addQuestion({ studentId, studentName: studentName || '', content, category: category || 'other' });
+  const { question, xpResult } = await addQuestion({ studentId, studentName: studentName || '', content, category: category || 'other' });
   return NextResponse.json({ ...question, xpResult }, { status: 201 });
 }

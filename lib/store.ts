@@ -1,43 +1,54 @@
-// Persistent file-based store for Vercel serverless
-// Data persists within the same instance lifetime (~5-15min)
-// Will migrate to Supabase for production
+// Persistent store using Upstash Redis for Vercel serverless
+// Data persists across deployments and cold starts
 
-import fs from 'fs';
-import path from 'path';
+import { Redis } from '@upstash/redis';
 
-const STORE_PATH = path.join(process.cwd(), '.data', 'store.json');
+// Initialize Redis client
+// Requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN env vars
+const redis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    })
+  : null;
 
-// Ensure data directory exists
-function ensureDataDir() {
-  const dir = path.dirname(STORE_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+const STORE_KEY = 'jg-coach-store-v2';
+
+// Load store from Redis or fallback to default
+async function loadStore(): Promise<StoreData> {
+  if (!redis) {
+    console.warn('Redis not configured, using default data');
+    return getDefaultStore();
   }
-}
-
-// Load store from file
-function loadStore(): StoreData {
+  
   try {
-    if (fs.existsSync(STORE_PATH)) {
-      const data = fs.readFileSync(STORE_PATH, 'utf-8');
-      const parsed = JSON.parse(data);
+    const data = await redis.get<StoreData>(STORE_KEY);
+    if (data) {
       // Restore Map from object
-      if (parsed.students) {
-        parsed.students = new Map(Object.entries(parsed.students));
+      if (data.students) {
+        data.students = new Map(Object.entries(data.students as any));
       }
-      return parsed;
+      return data;
     }
   } catch (err) {
-    console.error('Failed to load store:', err);
+    console.error('Failed to load store from Redis:', err);
   }
-  return getDefaultStore();
+  
+  // Initialize with default data on first run
+  const defaultStore = getDefaultStore();
+  await saveStore(defaultStore);
+  return defaultStore;
 }
 
-// Save store to file
-function saveStore() {
+// Save store to Redis
+async function saveStore(data?: StoreData) {
+  if (!redis) {
+    console.warn('Redis not configured, skipping save');
+    return;
+  }
+  
   try {
-    ensureDataDir();
-    const data: any = {
+    const storeData = data || {
       students: Object.fromEntries(students),
       trades,
       questions,
@@ -45,14 +56,15 @@ function saveStore() {
       weeklyDirection,
       stockQueries,
     };
-    fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    
+    await redis.set(STORE_KEY, storeData);
   } catch (err) {
-    console.error('Failed to save store:', err);
+    console.error('Failed to save store to Redis:', err);
   }
 }
 
 interface StoreData {
-  students: Map<string, Student>;
+  students: Map<string, Student> | Record<string, Student>;
   trades: TradeEntry[];
   questions: Question[];
   insights: Insight[];
@@ -345,47 +357,66 @@ function updateStreak(student: Student): boolean {
   return student.streak > 1; // true if streak continues
 }
 
-// ─── Storage ─── Load persistent data from file
-const storeData = loadStore();
-let students = storeData.students;
-let trades = storeData.trades;
-let questions = storeData.questions;
-let insights = storeData.insights;
-let weeklyDirection = storeData.weeklyDirection;
-let stockQueries = storeData.stockQueries;
+// ─── Storage ───
+// Initialize in-memory state (loaded on first API call)
+let students: Map<string, Student> = new Map();
+let trades: TradeEntry[] = [];
+let questions: Question[] = [];
+let insights: Insight[] = [];
+let weeklyDirection: WeeklyDirection | null = null;
+let stockQueries: StockQuery[] = [];
+let initialized = false;
+
+async function ensureInitialized() {
+  if (initialized) return;
+  const data = await loadStore();
+  students = data.students instanceof Map ? data.students : new Map(Object.entries(data.students as Record<string, Student>));
+  trades = data.trades;
+  questions = data.questions;
+  insights = data.insights;
+  weeklyDirection = data.weeklyDirection;
+  stockQueries = data.stockQueries;
+  initialized = true;
+}
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
 // ─── Students ───
-export function addStudent(data: Omit<Student, 'id' | 'createdAt' | 'xp' | 'level' | 'badges' | 'streak' | 'lastActiveDate'>): Student {
+export async function addStudent(data: Omit<Student, 'id' | 'createdAt' | 'xp' | 'level' | 'badges' | 'streak' | 'lastActiveDate'>): Promise<Student> {
+  await ensureInitialized();
   const student: Student = { ...data, id: genId(), xp: 0, level: 1, badges: [], streak: 0, lastActiveDate: '', createdAt: new Date().toISOString() };
   students.set(student.id, student);
-  saveStore();
+  await saveStore();
   return student;
 }
 
-export function getStudent(id: string): Student | undefined {
+export async function getStudent(id: string): Promise<Student | undefined> {
+  await ensureInitialized();
   return students.get(id);
 }
 
-export function updateStudent(id: string, patch: Partial<Student>): Student | null {
+export async function updateStudent(id: string, patch: Partial<Student>): Promise<Student | null> {
+  await ensureInitialized();
   const s = students.get(id);
   if (!s) return null;
   const updated = { ...s, ...patch, id: s.id, createdAt: s.createdAt };
   students.set(id, updated);
-  saveStore();
+  await saveStore();
   return updated;
 }
 
-export function getAllStudents(): Student[] {
+export async function getAllStudents(): Promise<Student[]> {
+  await ensureInitialized();
   return [...students.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-export function searchStudents(query: string): Student[] {
+export async function searchStudents(query: string): Promise<Student[]> {
+  await ensureInitialized();
   const q = query.toLowerCase();
-  return getAllStudents().filter(s =>
+  const all = await getAllStudents();
+  return all.filter(s =>
     s.name.toLowerCase().includes(q) ||
     s.tags.some(t => t.includes(q)) ||
     s.style.includes(q)
@@ -393,7 +424,8 @@ export function searchStudents(query: string): Student[] {
 }
 
 // ─── Trades (with XP) ───
-export function addTrade(data: Omit<TradeEntry, 'id' | 'createdAt'>): { trade: TradeEntry; xpResult?: ReturnType<typeof awardXp> } {
+export async function addTrade(data: Omit<TradeEntry, 'id' | 'createdAt'>): Promise<{ trade: TradeEntry; xpResult?: ReturnType<typeof awardXp> }> {
+  await ensureInitialized();
   const trade: TradeEntry = { ...data, id: genId(), createdAt: new Date().toISOString() };
   trades.unshift(trade);
   const student = students.get(data.studentId);
@@ -405,25 +437,29 @@ export function addTrade(data: Omit<TradeEntry, 'id' | 'createdAt'>): { trade: T
     if (streakContinued && student.streak > 1) xpAmount += 20; // streak bonus
     xpResult = awardXp(student, xpAmount);
   }
-  saveStore();
+  await saveStore();
   return { trade, xpResult };
 }
 
 // Backward compat: some API routes expect just TradeEntry
-export function addTradeCompat(data: Omit<TradeEntry, 'id' | 'createdAt'>): TradeEntry {
-  return addTrade(data).trade;
+export async function addTradeCompat(data: Omit<TradeEntry, 'id' | 'createdAt'>): Promise<TradeEntry> {
+  const result = await addTrade(data);
+  return result.trade;
 }
 
-export function getTradesByStudent(studentId: string): TradeEntry[] {
+export async function getTradesByStudent(studentId: string): Promise<TradeEntry[]> {
+  await ensureInitialized();
   return trades.filter(t => t.studentId === studentId);
 }
 
-export function getAllTrades(): TradeEntry[] {
+export async function getAllTrades(): Promise<TradeEntry[]> {
+  await ensureInitialized();
   return trades;
 }
 
 // ─── Questions (with XP) ───
-export function addQuestion(data: Omit<Question, 'id' | 'createdAt'>): { question: Question; xpResult?: ReturnType<typeof awardXp> } {
+export async function addQuestion(data: Omit<Question, 'id' | 'createdAt'>): Promise<{ question: Question; xpResult?: ReturnType<typeof awardXp> }> {
+  await ensureInitialized();
   const q: Question = { ...data, id: genId(), createdAt: new Date().toISOString() };
   questions.unshift(q);
   const student = students.get(data.studentId);
@@ -431,11 +467,12 @@ export function addQuestion(data: Omit<Question, 'id' | 'createdAt'>): { questio
   if (student) {
     xpResult = awardXp(student, 5);
   }
-  saveStore();
+  await saveStore();
   return { question: q, xpResult };
 }
 
-export function answerQuestion(id: string, answer: string, by: 'jg' | 'ai'): { question: Question | null; xpResult?: ReturnType<typeof awardXp> } {
+export async function answerQuestion(id: string, answer: string, by: 'jg' | 'ai'): Promise<{ question: Question | null; xpResult?: ReturnType<typeof awardXp> }> {
+  await ensureInitialized();
   const q = questions.find(q => q.id === id);
   if (!q) return { question: null };
   q.answer = answer;
@@ -449,23 +486,28 @@ export function answerQuestion(id: string, answer: string, by: 'jg' | 'ai'): { q
       xpResult = awardXp(student, 15);
     }
   }
+  await saveStore();
   return { question: q, xpResult };
 }
 
-export function getQuestionsByStudent(studentId: string): Question[] {
+export async function getQuestionsByStudent(studentId: string): Promise<Question[]> {
+  await ensureInitialized();
   return questions.filter(q => q.studentId === studentId);
 }
 
-export function getAllQuestions(): Question[] {
+export async function getAllQuestions(): Promise<Question[]> {
+  await ensureInitialized();
   return questions;
 }
 
-export function getUnansweredQuestions(): Question[] {
+export async function getUnansweredQuestions(): Promise<Question[]> {
+  await ensureInitialized();
   return questions.filter(q => !q.answer);
 }
 
 // ─── Weekly Direction ───
-export function setWeeklyDirection(content: string): WeeklyDirection {
+export async function setWeeklyDirection(content: string): Promise<WeeklyDirection> {
+  await ensureInitialized();
   const now = new Date();
   const day = now.getDay();
   const monday = new Date(now);
@@ -476,15 +518,18 @@ export function setWeeklyDirection(content: string): WeeklyDirection {
     content,
     createdAt: new Date().toISOString(),
   };
+  await saveStore();
   return weeklyDirection;
 }
 
-export function getWeeklyDirection(): WeeklyDirection | null {
+export async function getWeeklyDirection(): Promise<WeeklyDirection | null> {
+  await ensureInitialized();
   return weeklyDirection;
 }
 
 // ─── Insights ───
-export function addInsight(data: { content: string; tickers?: string[]; category?: Insight['category'] }): Insight {
+export async function addInsight(data: { content: string; tickers?: string[]; category?: Insight['category'] }): Promise<Insight> {
+  await ensureInitialized();
   const tickers = data.tickers && data.tickers.length > 0
     ? data.tickers
     : extractTickers(data.content);
@@ -496,17 +541,21 @@ export function addInsight(data: { content: string; tickers?: string[]; category
     createdAt: new Date().toISOString(),
   };
   insights.unshift(insight);
+  await saveStore();
   return insight;
 }
 
-export function getInsights(limit = 50): Insight[] {
+export async function getInsights(limit = 50): Promise<Insight[]> {
+  await ensureInitialized();
   return insights.slice(0, limit);
 }
 
-export function deleteInsight(id: string): boolean {
+export async function deleteInsight(id: string): Promise<boolean> {
+  await ensureInitialized();
   const idx = insights.findIndex(i => i.id === id);
   if (idx === -1) return false;
   insights.splice(idx, 1);
+  await saveStore();
   return true;
 }
 
@@ -517,18 +566,22 @@ function extractTickers(text: string): string[] {
 }
 
 // ─── Stock Queries (with XP) ───
-export function addStockQuery(data: { studentId: string; studentName: string; symbol: string }): StockQuery {
+export async function addStockQuery(data: { studentId: string; studentName: string; symbol: string }): Promise<StockQuery> {
+  await ensureInitialized();
   const q: StockQuery = { ...data, id: genId(), symbol: data.symbol.toUpperCase(), createdAt: new Date().toISOString() };
   stockQueries.unshift(q);
+  await saveStore();
   return q;
 }
 
-export function getStockQueries(studentId?: string): StockQuery[] {
+export async function getStockQueries(studentId?: string): Promise<StockQuery[]> {
+  await ensureInitialized();
   if (studentId) return stockQueries.filter(q => q.studentId === studentId);
   return stockQueries;
 }
 
-export function getStockQueryStats(): { symbol: string; count: number; lastQueried: string }[] {
+export async function getStockQueryStats(): Promise<{ symbol: string; count: number; lastQueried: string }[]> {
+  await ensureInitialized();
   const map = new Map<string, { count: number; lastQueried: string }>();
   for (const q of stockQueries) {
     const existing = map.get(q.symbol);
@@ -545,7 +598,8 @@ export function getStockQueryStats(): { symbol: string; count: number; lastQueri
 }
 
 // ─── Daily Missions ───
-export function getDailyMissions(studentId: string): { id: string; label: string; done: boolean }[] {
+export async function getDailyMissions(studentId: string): Promise<{ id: string; label: string; done: boolean }[]> {
+  await ensureInitialized();
   const today = new Date().toISOString().split('T')[0];
   const todayTrades = trades.filter(t => t.studentId === studentId && t.date === today);
   const todayQs = questions.filter(q => q.studentId === studentId && q.createdAt.startsWith(today));
@@ -558,8 +612,9 @@ export function getDailyMissions(studentId: string): { id: string; label: string
 }
 
 // ─── Leaderboard ───
-export function getLeaderboard(): { rank: number; name: string; xp: number; level: number; title: string; streak: number; isTopWeekly: boolean }[] {
-  const all = getAllStudents();
+export async function getLeaderboard(): Promise<{ rank: number; name: string; xp: number; level: number; title: string; streak: number; isTopWeekly: boolean }[]> {
+  await ensureInitialized();
+  const all = await getAllStudents();
   const sorted = all.sort((a, b) => b.xp - a.xp);
   return sorted.map((s, i) => {
     const info = getLevelInfo(s.xp);
@@ -576,9 +631,10 @@ export function getLeaderboard(): { rank: number; name: string; xp: number; leve
 }
 
 // ─── Analytics ───
-export function getStudentAnalytics(studentId: string) {
-  const studentTrades = getTradesByStudent(studentId);
-  const studentQuestions = getQuestionsByStudent(studentId);
+export async function getStudentAnalytics(studentId: string) {
+  await ensureInitialized();
+  const studentTrades = await getTradesByStudent(studentId);
+  const studentQuestions = await getQuestionsByStudent(studentId);
 
   if (studentTrades.length === 0) {
     return { totalTrades: 0, buys: 0, sells: 0, symbols: [], questionCount: studentQuestions.length, needsHelp: [] };

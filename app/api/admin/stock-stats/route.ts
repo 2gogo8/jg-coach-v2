@@ -4,8 +4,8 @@ import { getStockQueryStats, getStockQueries } from '@/lib/store';
 export const maxDuration = 30;
 
 export async function GET() {
-  const topStocks = getStockQueryStats();
-  const allQueries = getStockQueries();
+  const topStocks = await getStockQueryStats();
+  const allQueries = await getStockQueries();
   const recentQueries = allQueries.slice(0, 20).map(q => ({
     studentId: q.studentId,
     studentName: q.studentName,

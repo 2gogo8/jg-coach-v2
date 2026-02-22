@@ -6,8 +6,8 @@ export const maxDuration = 30;
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const studentId = searchParams.get('studentId');
-  if (studentId) return NextResponse.json(getTradesByStudent(studentId));
-  return NextResponse.json(getAllTrades());
+  if (studentId) return NextResponse.json(await getTradesByStudent(studentId));
+  return NextResponse.json(await getAllTrades());
 }
 
 export async function POST(request: Request) {
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   if (!studentId || !symbol || !action || !price || !shares || !date) {
     return NextResponse.json({ error: '缺少必要欄位' }, { status: 400 });
   }
-  const { trade, xpResult } = addTrade({
+  const { trade, xpResult } = await addTrade({
     studentId,
     symbol: symbol.toUpperCase(),
     market: market || 'US',

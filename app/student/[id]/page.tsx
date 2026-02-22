@@ -39,6 +39,7 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
   const [askTab, setAskTab] = useState<AskTab>('mine');
   const [publicQuestions, setPublicQuestions] = useState<PublicQuestionsData | null>(null);
   const [showDataWarning, setShowDataWarning] = useState(true);
+  const [recentSymbols, setRecentSymbols] = useState<string[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -78,6 +79,11 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
     const auth = getAuth();
     if (!auth.role) { router.replace('/auth'); return; }
     loadData();
+    // Load recent symbols from localStorage
+    try {
+      const stored = localStorage.getItem('jg-recent-symbols');
+      if (stored) setRecentSymbols(JSON.parse(stored));
+    } catch { /* ignore */ }
   }, [router, loadData]);
 
   // Streak message

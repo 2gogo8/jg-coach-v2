@@ -10,7 +10,7 @@ export async function POST(
   const { id } = await params;
   const { answer, by } = await request.json();
   if (!answer) return NextResponse.json({ error: '缺少回覆內容' }, { status: 400 });
-  const { question, xpResult } = answerQuestion(id, answer, by || 'jg');
+  const { question, xpResult } = await answerQuestion(id, answer, by || 'jg');
   if (!question) return NextResponse.json({ error: '找不到問題' }, { status: 404 });
   return NextResponse.json({ ...question, xpResult });
 }
