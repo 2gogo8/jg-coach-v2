@@ -53,8 +53,19 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
         fetch('/api/questions/public'),
       ]);
       if (sRes.ok) setStudent(await sRes.json());
-      if (tRes.ok) setTrades(await tRes.json());
-      if (qRes.ok) setQuestions(await qRes.json());
+      if (tRes.ok) {
+        const apiTrades = await tRes.json();
+        // Merge with localStorage fallback
+        const localTrades = loadLocalTrades(id);
+        const merged = mergeTradesWithLocal(apiTrades, localTrades);
+        setTrades(merged);
+      }
+      if (qRes.ok) {
+        const apiQuestions = await qRes.json();
+        const localQuestions = loadLocalQuestions(id);
+        const merged = mergeQuestionsWithLocal(apiQuestions, localQuestions);
+        setQuestions(merged);
+      }
       if (pubQRes.ok) setPublicQuestions(await pubQRes.json());
       if (dRes.ok) { const d = await dRes.json(); if (d) setDirection(d); }
       if (allTRes.ok) {
@@ -607,8 +618,13 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
           onClose={(saved, newTrade) => {
             setShowTradeModal(false);
             if (saved && newTrade) { 
+              // Clean the trade object (remove xpResult if present)
+              const { xpResult, ...cleanTrade } = newTrade as Trade & { xpResult?: unknown };
               // Optimistic update: add new trade immediately to local state
-              setTrades(prev => [newTrade, ...prev]);
+              const updatedTrades = [cleanTrade, ...trades];
+              setTrades(updatedTrades);
+              // Save to localStorage for persistence across refreshes
+              saveLocalTrades(id, updatedTrades);
               setJustSaved(true); 
               setToast({ message: '交易已記錄！', type: 'success' });
               setTimeout(() => setJustSaved(false), 1200); 
@@ -625,7 +641,10 @@ export default function StudentPage({ params }: { params: Promise<{ id: string }
           setShowQuestionModal(false);
           if (newQuestion) {
             // Optimistic update: add new question immediately to local state
-            setQuestions(prev => [newQuestion, ...prev]);
+            const updatedQuestions = [newQuestion, ...questions];
+            setQuestions(updatedQuestions);
+            // Save to localStorage for persistence across refreshes
+            saveLocalQuestions(id, updatedQuestions);
             setToast({ message: '提問已送出！', type: 'success' });
             // Delayed sync to avoid overwriting optimistic update with stale data
             setTimeout(() => loadData(), 2000);
@@ -1015,4 +1034,67 @@ function QuestionModal({ studentId, studentName, onClose }: { studentId: string;
       </div>
     </div>
   );
+}
+
+// ─── LocalStorage Fallback (for persistence between refreshes) ───
+function loadLocalTrades(studentId: string): Trade[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const key = `jg-coach-trades-${studentId}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalTrades(studentId: string, trades: Trade[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const key = `jg-coach-trades-${studentId}`;
+    localStorage.setItem(key, JSON.stringify(trades));
+  } catch (err) {
+    console.warn('Failed to save trades to localStorage:', err);
+  }
+}
+
+function loadLocalQuestions(studentId: string): Question[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const key = `jg-coach-questions-${studentId}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalQuestions(studentId: string, questions: Question[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const key = `jg-coach-questions-${studentId}`;
+    localStorage.setItem(key, JSON.stringify(questions));
+  } catch (err) {
+    console.warn('Failed to save questions to localStorage:', err);
+  }
+}
+
+function mergeTradesWithLocal(apiTrades: Trade[], localTrades: Trade[]): Trade[] {
+  const map = new Map<string, Trade>();
+  // API trades take priority (source of truth when available)
+  apiTrades.forEach(t => map.set(t.id, t));
+  // Add local trades that don't exist in API (fallback for unsaved data)
+  localTrades.forEach(t => {
+    if (!map.has(t.id)) map.set(t.id, t);
+  });
+  return Array.from(map.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+function mergeQuestionsWithLocal(apiQuestions: Question[], localQuestions: Question[]): Question[] {
+  const map = new Map<string, Question>();
+  apiQuestions.forEach(q => map.set(q.id, q));
+  localQuestions.forEach(q => {
+    if (!map.has(q.id)) map.set(q.id, q);
+  });
+  return Array.from(map.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
