@@ -53,32 +53,47 @@ export default function LandingPage() {
     <div className="min-h-screen" style={{ background: '#000', color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif' }}>
 
       {/* NAV */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Image src="/jg-logo.png" alt="JG說真的" width={36} height={36} style={{ objectFit: 'contain' }} />
+      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '0 28px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Image src="/jg-logo.png" alt="JG說真的" width={52} height={52} style={{ objectFit: 'contain' }} />
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.3px', lineHeight: 1 }}>JG 說真的</div>
-            <div style={{ fontSize: 9, color: '#8A8A8E', letterSpacing: '0.05em', lineHeight: 1, marginTop: 2 }}>TRUE STOCK</div>
+            <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1.1 }}>JG 說真的</div>
+            <div style={{ fontSize: 10, color: '#636366', letterSpacing: '0.12em', lineHeight: 1, marginTop: 3 }}>TRUE STOCK</div>
           </div>
         </div>
-        <Link href="/auth" style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '6px 18px', fontSize: 13, fontWeight: 500, textDecoration: 'none', backdropFilter: 'blur(10px)' }}>
+        <Link href="/auth" style={{ background: '#E8001A', color: '#fff', border: 'none', borderRadius: 20, padding: '8px 22px', fontSize: 14, fontWeight: 600, textDecoration: 'none' }}>
           學員登入
         </Link>
       </nav>
 
       {/* HERO */}
-      <section style={{ textAlign: 'center', padding: '80px 24px 64px', maxWidth: 600, margin: '0 auto' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(232,0,26,0.12)', border: '1px solid rgba(232,0,26,0.25)', borderRadius: 20, padding: '5px 14px', marginBottom: 32 }}>
+      <section style={{ textAlign: 'center', padding: '56px 24px 40px', maxWidth: 680, margin: '0 auto' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(232,0,26,0.12)', border: '1px solid rgba(232,0,26,0.25)', borderRadius: 20, padding: '5px 14px', marginBottom: 24 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#E8001A' }} />
-          <span style={{ fontSize: 12, color: '#E8001A', fontWeight: 500, letterSpacing: '0.03em' }}>20位戰友 · 真實對帳單</span>
+          <span style={{ fontSize: 12, color: '#E8001A', fontWeight: 500, letterSpacing: '0.03em' }}>20位戰友 · 真實對帳單 · 2025/12-2026/03</span>
         </div>
 
-        <div style={{ fontSize: 'clamp(52px, 10vw, 80px)', fontWeight: 700, letterSpacing: '-2px', lineHeight: 1.05, marginBottom: 12 }}>
+        <div style={{ fontSize: 'clamp(52px, 12vw, 96px)', fontWeight: 800, letterSpacing: '-3px', lineHeight: 1, marginBottom: 10 }}>
           <span style={{ color: '#fff' }}>+</span>
           <span style={{ color: '#E8001A' }}>{TOTAL_PNL}</span>
         </div>
-        <div style={{ fontSize: 16, color: '#6D6D72', marginBottom: 8, letterSpacing: '-0.2px' }}>TWD 戰友合計損益</div>
-        <div style={{ fontSize: 13, color: '#48484A', marginBottom: 48 }}>每筆都是真實對帳單，不是廣告</div>
+        <div style={{ fontSize: 17, color: '#8A8A8E', marginBottom: 6, letterSpacing: '-0.3px' }}>TWD 戰友合計損益</div>
+        <div style={{ fontSize: 13, color: '#48484A', marginBottom: 32 }}>每筆都是真實對帳單，不是廣告</div>
+
+        {/* Quick highlights */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 32 }}>
+          {[
+            { label: '最高單人', value: '+1,981,063', unit: 'TWD · WOLF' },
+            { label: '最高勝率', value: '83.3%', unit: '42筆 · 張建凱' },
+            { label: '台股最快', value: '+103%', unit: '3筆 · JYL' },
+          ].map(h => (
+            <div key={h.label} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '10px 16px', textAlign: 'left' }}>
+              <div style={{ fontSize: 11, color: '#636366', marginBottom: 3 }}>{h.label}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#30D158', letterSpacing: '-0.3px' }}>{h.value}</div>
+              <div style={{ fontSize: 11, color: '#48484A' }}>{h.unit}</div>
+            </div>
+          ))}
+        </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/auth" style={{ background: '#E8001A', color: '#fff', borderRadius: 24, padding: '14px 36px', fontSize: 17, fontWeight: 600, textDecoration: 'none', letterSpacing: '-0.3px' }}>
