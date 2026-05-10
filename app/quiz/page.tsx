@@ -421,159 +421,37 @@ function t7Level(score: number) {
   return { level: '運氣為主', color: '#FF453A', desc: '充滿好賭心態與自我欺騙，市場漲勢掩蓋了你的問題，市場一旦轉向，風險極高。' };
 }
 
-// ─── PDF 生成 ─────────────────────────────────────────────────────────────────
+// ─── PDF 生成（截圖方式，支援中文）───────────────────────────────────────────
 async function generatePDF(name: string, type: TraderType, traits: Record<Trait, number>, weaknesses: Weakness[], answers: Record<number, string>) {
+  // 截取結果頁面的 DOM 元素轉成圖片，再放進 PDF
+  const { toPng } = await import('html-to-image');
   const { jsPDF } = await import('jspdf');
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  const W = 210, M = 18;
-  let y = 0;
+  const el = document.getElementById('result-content');
+  if (!el) return;
 
-  // 黑底背景
-  doc.setFillColor(0, 0, 0);
-  doc.rect(0, 0, W, 297, 'F');
-
-  // Header
-  y = 22;
-  doc.setFontSize(9); doc.setTextColor(140, 140, 150);
-  doc.text('JG 說真的 · TRUE STOCK', M, y); doc.text('交易者心理測驗 v3.0', W - M, y, { align: 'right' });
-
-  // 名字
-  y += 14;
-  doc.setFontSize(28); doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.text(name, M, y);
-  y += 8;
-  doc.setFontSize(11); doc.setTextColor(100, 100, 110);
-  doc.setFont('helvetica', 'normal');
-  doc.text('你的交易者心理測驗結果', M, y);
-
-  // 分隔線
-  y += 8;
-  doc.setDrawColor(40, 40, 40); doc.setLineWidth(0.3);
-  doc.line(M, y, W - M, y);
-
-  // 類型
-  y += 14;
-  doc.setFontSize(11); doc.setTextColor(232, 0, 26);
-  doc.text('你的交易者類型', M, y);
-  y += 10;
-  doc.setFontSize(36); doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`${type.emoji} ${type.name}`, M, y);
-  y += 9;
-  doc.setFontSize(13); doc.setTextColor(180, 180, 190);
-  doc.setFont('helvetica', 'italic');
-  doc.text(`「${type.tagline}」`, M, y);
-
-  // 個性解碼
-  y += 14;
-  doc.setFontSize(10); doc.setTextColor(232, 0, 26);
-  doc.setFont('helvetica', 'bold');
-  doc.text('個性解碼', M, y);
-  y += 7;
-  doc.setFontSize(10); doc.setTextColor(200, 200, 210);
-  doc.setFont('helvetica', 'normal');
-  const decodeLines = doc.splitTextToSize(type.decode, W - M * 2);
-  doc.text(decodeLines, M, y); y += decodeLines.length * 5 + 4;
-
-  // 金句
-  doc.setFillColor(20, 20, 20);
-  doc.roundedRect(M, y, W - M*2, 14, 3, 3, 'F');
-  doc.setFontSize(10); doc.setTextColor(232, 0, 26);
-  doc.setFont('helvetica', 'bold');
-  doc.text(`"${type.quote}"`, M + 6, y + 9);
-  y += 20;
-
-  // 四萬點注意事項
-  doc.setFontSize(10); doc.setTextColor(232, 0, 26);
-  doc.setFont('helvetica', 'bold');
-  doc.text('⚠️  注意事項', M, y);
-  y += 7;
-  doc.setFontSize(10); doc.setTextColor(180, 180, 190);
-  doc.setFont('helvetica', 'normal');
-  const warnLines = doc.splitTextToSize(type.warning, W - M * 2);
-  doc.text(warnLines, M, y); y += warnLines.length * 5 + 6;
-
-  // 分隔線
-  doc.line(M, y, W - M, y); y += 12;
-
-  // T7 危險指數
-  const t7 = t7Level(traits.T7);
-  doc.setFontSize(10); doc.setTextColor(232, 0, 26);
-  doc.setFont('helvetica', 'bold');
-  doc.text('危險指數', M, y);
-  y += 7;
-  doc.setFontSize(13); doc.setTextColor(255, 255, 255);
-  doc.text(`${traits.T7} 分 — ${t7.level}`, M, y);
-  y += 7;
-  doc.setFontSize(9); doc.setTextColor(160, 160, 170);
-  doc.setFont('helvetica', 'normal');
-  const t7Lines = doc.splitTextToSize(t7.desc, W - M * 2);
-  doc.text(t7Lines, M, y); y += t7Lines.length * 5 + 8;
-
-  // 七大特質
-  doc.line(M, y, W - M, y); y += 12;
-  doc.setFontSize(10); doc.setTextColor(232, 0, 26);
-  doc.setFont('helvetica', 'bold');
-  doc.text('七大特質分數', M, y); y += 8;
-
-  const traits_list: Trait[] = ['T1','T2','T3','T4','T5','T6','T7'];
-  traits_list.forEach(k => {
-    const score = traits[k];
-    const info = TRAIT_LABELS[k];
-    doc.setFontSize(9); doc.setTextColor(180, 180, 190);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`${info.name}`, M, y);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${score}`, W - M, y, { align: 'right' });
-    // bar
-    const barW = W - M*2 - 20;
-    const maxScore = 12;
-    const barFill = Math.max(0, Math.min(barW, barW * score / maxScore));
-    doc.setFillColor(30, 30, 32);
-    doc.roundedRect(M, y + 2, barW, 3, 1, 1, 'F');
-    if (barFill > 0) {
-      doc.setFillColor(k === 'T7' ? 232 : 48, k === 'T7' ? 0 : 209, k === 'T7' ? 26 : 88);
-      doc.roundedRect(M, y + 2, barFill, 3, 1, 1, 'F');
-    }
-    y += 11;
-  });
-
-  // 弱點
-  const triggered = WEAKNESSES.filter(w => w.trigger(answers));
-  if (triggered.length > 0) {
-    y += 4;
-    doc.line(M, y, W - M, y); y += 12;
-    doc.setFontSize(10); doc.setTextColor(255, 69, 58);
-    doc.setFont('helvetica', 'bold');
-    doc.text('⚠️  偵測到的致命弱點', M, y); y += 8;
-    triggered.forEach(w => {
-      doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`▶  ${w.name}`, M, y); y += 6;
-      doc.setFontSize(9); doc.setTextColor(180, 180, 190);
-      doc.setFont('helvetica', 'normal');
-      const wLines = doc.splitTextToSize(w.warning, W - M * 2);
-      doc.text(wLines, M, y); y += wLines.length * 5 + 6;
+  try {
+    // 截圖（2x 解析度）
+    const dataUrl = await toPng(el, {
+      quality: 0.95,
+      pixelRatio: 2,
+      backgroundColor: '#000000',
     });
-  } else {
-    y += 4;
-    doc.line(M, y, W - M, y); y += 12;
-    doc.setFontSize(10); doc.setTextColor(48, 209, 88);
-    doc.setFont('helvetica', 'bold');
-    doc.text('✅  未偵測到致命弱點', M, y); y += 7;
-    doc.setFontSize(9); doc.setTextColor(160, 160, 170);
-    doc.setFont('helvetica', 'normal');
-    doc.text('你的心理結構相對穩定，但請持續保持自我覺察。', M, y);
+
+    const img = new Image();
+    img.src = dataUrl;
+    await new Promise(r => { img.onload = r; });
+
+    const W = 210; // A4 width mm
+    const H = (img.height / img.width) * W;
+    const doc = new jsPDF({ orientation: H > W ? 'portrait' : 'landscape', unit: 'mm', format: [W, Math.max(297, H)] });
+
+    doc.addImage(dataUrl, 'PNG', 0, 0, W, H);
+    doc.save(`${name}_交易者心理測驗結果.pdf`);
+  } catch (e) {
+    console.error('PDF generation failed:', e);
+    alert('PDF 生成失敗，請嘗試瀏覽器列印（Ctrl+P）存成 PDF');
   }
-
-  // Footer
-  doc.setFontSize(8); doc.setTextColor(60, 60, 70);
-  doc.text('JG 說真的 · TRUE STOCK | 交易者心理測驗 v3.0 | 僅供學習參考，非投資建議', W/2, 287, { align: 'center' });
-
-  doc.save(`${name}_交易者心理測驗結果.pdf`);
 }
 
 // ─── 主頁面 ───────────────────────────────────────────────────────────────────
@@ -697,7 +575,7 @@ export default function QuizPage() {
     const t7 = t7Level(traits.T7);
     return (
       <div style={{ ...S, padding: '40px 24px 80px' }}>
-        <div style={{ maxWidth: 580, margin: '0 auto' }}>
+        <div id="result-content" style={{ maxWidth: 580, margin: '0 auto', padding: '0 0 20px' }}>
           <Link href="/" style={{ fontSize: 13, color: '#636366', textDecoration: 'none' }}>← 返回首頁</Link>
 
           {/* Type Header */}
