@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudent, updateStudent } from '@/lib/store';
+import { getStudent, updateStudent, deleteStudent } from '@/lib/store';
 
 export const maxDuration = 30;
 
@@ -22,4 +22,14 @@ export async function PATCH(
   const updated = updateStudent(id, patch);
   if (!updated) return NextResponse.json({ error: '找不到學生' }, { status: 404 });
   return NextResponse.json(updated);
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const ok = await deleteStudent(id);
+  if (!ok) return NextResponse.json({ error: '找不到學生' }, { status: 404 });
+  return NextResponse.json({ ok: true });
 }

@@ -433,6 +433,20 @@ export async function updateStudent(id: string, patch: Partial<Student>): Promis
   return updated;
 }
 
+export async function deleteStudent(id: string): Promise<boolean> {
+  await ensureStoreLoaded();
+  if (!students.has(id)) return false;
+  students.delete(id);
+  // also remove trades and questions for this student
+  const tradesBefore = trades.length;
+  const removeTrades = trades.filter(t => t.studentId === id);
+  removeTrades.forEach(t => { const idx = trades.indexOf(t); if (idx >= 0) trades.splice(idx, 1); });
+  const removeQs = questions.filter(q => q.studentId === id);
+  removeQs.forEach(q => { const idx = questions.indexOf(q); if (idx >= 0) questions.splice(idx, 1); });
+  await saveStore();
+  return true;
+}
+
 export async function getAllStudents(): Promise<Student[]> {
   await ensureStoreLoaded();
   return [...students.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
