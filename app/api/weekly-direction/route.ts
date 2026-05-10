@@ -4,7 +4,7 @@ import { setWeeklyDirection, getWeeklyDirection } from '@/lib/store';
 export const maxDuration = 30;
 
 export async function GET() {
-  const direction = getWeeklyDirection();
+  const direction = await getWeeklyDirection();
   if (!direction) return NextResponse.json(null);
   return NextResponse.json(direction);
 }
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '需要 content' }, { status: 400 });
     }
 
-    const direction = setWeeklyDirection(content.trim());
+    const direction = await setWeeklyDirection(content.trim());
     return NextResponse.json(direction);
   } catch {
     return NextResponse.json({ error: '格式錯誤' }, { status: 400 });
