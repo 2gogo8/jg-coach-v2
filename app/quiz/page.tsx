@@ -48,7 +48,7 @@ const TRADER_TYPES: TraderType[] = [
   {
     id: 'ambush', name: '伏擊者', emoji: '🐆',
     tagline: '等待就是武器，爆發才是目的',
-    formula: t => t.T1*3 + t.T4*3 + t.T2*2 + t.T5*2,
+    formula: t => t.T1*5 + t.T4*4 - t.T2*1 - t.T3*1,
     decode: '你有極強的耐受孤獨能力，能在沒有任何反饋的情況下等待很長時間。你不需要每天都有動作，你的能量在等待中積累，在爆發時釋放。你對風險的承受度高，能接受大起大落，進出有明確的邏輯，不是衝動。',
     quote: '大多數人輸在等不了，不是輸在看不懂。',
     warning: '高檔震盪是你最大的敵人。你擅長趨勢行情，但震盪市場會讓你的等待策略頻繁觸發假訊號。高點以上請嚴格縮小部位，只在最確定的機會出手，不要因為「感覺快要爆發了」而提前進場。'
@@ -56,7 +56,7 @@ const TRADER_TYPES: TraderType[] = [
   {
     id: 'discipline', name: '紀律者', emoji: '⚙️',
     tagline: '不求每筆都賺，只求每筆都對',
-    formula: t => t.T2*3 + t.T5*3 + t.T1*2 + t.T4*(-1),
+    formula: t => t.T2*6 - t.T3*3 - t.T1*1 - t.T4*1,
     decode: '你是天生的規則執行者。你的完美主義不是追求完美的結果，而是追求完美的執行。你相信只要每一筆都按規則來，長期下來複利效果會讓你遠超大多數人。你不需要大賺，你需要的是不犯錯。',
     quote: '我不追求每筆都賺，我只追求每筆都對。',
     warning: '你最大的風險是「這次例外」。高點的市場充滿誘惑，每一天都有看起來很好的機會，但你的系統告訴你不要動。記住：你的系統是在你冷靜的時候設計的，不是在市場最熱的時候設計的。'
@@ -64,7 +64,7 @@ const TRADER_TYPES: TraderType[] = [
   {
     id: 'striker', name: '閃擊者', emoji: '⚡',
     tagline: '感覺到了就要動，猶豫的人永遠在追',
-    formula: t => t.T3*3 + t.T4*2 + t.T1*(-1),
+    formula: t => t.T3*6 + t.T4*2 - t.T2*3 - t.T5*2,
     decode: '你靠的是對節奏的感知，而不是對邏輯的計算。你能在別人還沒反應的時候感覺到市場的轉折，然後快速出手。你的優勢在速度，你的弱點也在速度——太快有時候是太早。',
     quote: '感覺到了就要動，猶豫的人永遠在追。',
     warning: '你的感知能力在特定的標的和週期上是有效的，但在其他地方可能只是幻覺。請嚴格限制自己只在你最熟悉的那個戰場作戰，不要因為「感覺到了」就跨出你的舒適圈。'
@@ -72,7 +72,7 @@ const TRADER_TYPES: TraderType[] = [
   {
     id: 'system', name: '系統者', emoji: '🔩',
     tagline: '系統的價值，在你最不想執行它的時候才體現',
-    formula: t => t.T5*3 + t.T2*3 + t.T1*2 + t.T4*2,
+    formula: t => t.T5*5 + t.T1*3 - t.T3*2,
     decode: '你是最難被市場打倒的那種人。你的系統不是最賺錢的，但是最耐磨的。你能在連輸五局之後繼續執行，因為你相信長期的樣本才是真相，短期的結果只是雜訊。',
     quote: '系統的價值，在你最不想執行它的時候才能體現。',
     warning: '你的風險是過度相信系統而忽略市場結構的根本改變。歷史高點是一個特殊的位置，市場的特性可能已經改變。請定期回測你的系統，確認它在當前的市場環境下還有效。'
@@ -80,7 +80,7 @@ const TRADER_TYPES: TraderType[] = [
   {
     id: 'macro', name: '佈局者', emoji: '🗺️',
     tagline: '大多數人看價格，我看方向',
-    formula: t => t.T6*3 + t.T1*2 + t.T4*2 + t.T5*2,
+    formula: t => t.T6*4 + t.T1*4 + t.T4*2 - t.T2*1,
     decode: '你看的不是今天，你看的是三個月後、六個月後。你能把宏觀的經濟趨勢、產業輪動、政策方向整合成一個清晰的佈局，然後耐心等待市場走到你預期的位置。',
     quote: '大多數人看的是價格，我看的是方向。',
     warning: '宏觀佈局在趨勢市場中威力巨大，但在高檔震盪中容易讓你持有太久。請為你的每一個佈局設定明確的「失效條件」——如果這個條件觸發，不管你的宏觀判斷多有信心，都要先出場。'
@@ -88,7 +88,7 @@ const TRADER_TYPES: TraderType[] = [
   {
     id: 'focus', name: '聚焦者', emoji: '🎯',
     tagline: '我只做我最懂的那一個，其他的我不碰',
-    formula: t => t.T6*3 + t.T4*3 + t.T1*2 + t.T5*2,
+    formula: t => t.T6*3 + t.T4*5 - t.T1*1,
     decode: '你把所有的資源和注意力集中在一個你深度研究過的領域，然後在這個領域做到極致。你不分散，你不跨界，你的護城河就是你比任何人都更了解你的戰場。',
     quote: '我只做我最懂的那一個，其他的我不碰。',
     warning: '你的風險是你的戰場可能因為市場結構改變而失效。你熟悉的那個標的或板塊可能不再是市場的主角。請保持對你戰場的持續研究，而不是依賴過去的經驗。'
@@ -96,7 +96,7 @@ const TRADER_TYPES: TraderType[] = [
   {
     id: 'hunter', name: '主題獵人', emoji: '🎣',
     tagline: '主題的錢最好賺，但只有最早發現的人才能賺到',
-    formula: t => t.T6*3 + t.T5*2 + t.T4*2 + t.T1*2,
+    formula: t => t.T6*4 + t.T3*3 - t.T2*2 - t.T1*1,
     decode: '你有敏銳的嗅覺，能在主題還沒被市場廣泛認知之前就發現它，然後在主題爆發的時候站在最前面。你的優勢是早，你的風險也是早——太早進場有時候就是進場在沒人關注的地方等很久。',
     quote: '主題的錢最好賺，但只有最早發現的人才能賺到。',
     warning: '高點之後，每一個主題都會有大量的跟風者，主題的生命週期會越來越短。你需要更快地判斷「這個主題是真的還是假的」，並且更快地在主題退潮之前出場。'
@@ -104,7 +104,7 @@ const TRADER_TYPES: TraderType[] = [
   {
     id: 'guardian', name: '守法者', emoji: '🏛️',
     tagline: '規則不是束縛，規則是保護',
-    formula: t => t.T2*3 + t.T5*3 + t.T4*(-1) + t.T3*(-1),
+    formula: t => t.T2*4 + t.T5*3 - t.T4*3 - t.T3*3,
     decode: '你是最嚴格的規則遵守者。你的系統不只是一套方法，它是你的信仰。你相信只要嚴格遵守規則，長期下來一定會有正期望值。你最大的優勢是你永遠不會因為情緒而破壞自己的系統。',
     quote: '規則不是束縛，規則是保護。',
     warning: '你的系統可能是在特定的市場環境下設計的。歷史高點是一個新的挑戰，市場的波動率和流動性可能都發生了變化。請確認你的系統參數在當前環境下仍然有效，必要時做適當的調整。'
@@ -421,44 +421,38 @@ function t7Level(score: number) {
   return { level: '運氣為主', color: '#FF453A', desc: '充滿好賭心態與自我欺騙，市場漲勢掩蓋了你的問題，市場一旦轉向，風險極高。' };
 }
 
-// ─── PDF 生成（列印方式，支援中文）───────────────────────────────────────────
-function generatePDF(_name: string, _type: TraderType, _traits: Record<Trait, number>, _weaknesses: Weakness[], _answers: Record<number, string>) {
-  // 注入列印樣式，降低關烦元素
+// ─── 儲存結果（手機/電腦通用）───────────────────────────────────────────
+function generatePDF(name: string, _type: TraderType, _traits: Record<Trait, number>, _weaknesses: Weakness[], _answers: Record<number, string>) {
+  // 手機就列印，電腦也列印 — 最簡單的對齊方式
+  const isMobile = /iPhone|iPad|Android|Mobile/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    // 手機：著中提示手動截圖
+    alert(`請對繐果頁面截圖儲存！
+
+iOS: 按「電源+音量或 Home」手機快捷鍵
+Android: 按「電源+音量減」或透過通知欄截圖
+
+結果就在這頁，截圖就行了！`);
+    return;
+  }
+  
+  // 電腦：列印對話框
   const style = document.createElement('style');
-  style.id = 'print-style';
   style.textContent = `
     @media print {
-      body > *:not(#print-wrapper) { display: none !important; }
-      #print-wrapper { display: block !important; }
-      nav, header, footer { display: none !important; }
-      a[href]:not(.print-keep) { color: inherit !important; }
+      body * { visibility: hidden; }
+      #result-content, #result-content * { visibility: visible; }
+      #result-content { position: absolute; left: 0; top: 0; width: 100%; background: #000 !important; color: #fff !important; }
       button { display: none !important; }
-      @page { margin: 10mm; }
+      a { color: inherit !important; text-decoration: none !important; }
+      @page { margin: 10mm; background: #000; }
     }
   `;
   document.head.appendChild(style);
-
-  // 建立列印專用容器
-  const wrapper = document.createElement('div');
-  wrapper.id = 'print-wrapper';
-  wrapper.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; background:#000; color:#fff; padding:20px; box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
-
-  // 複製結果內容
-  const resultEl = document.getElementById('result-content');
-  if (resultEl) {
-    wrapper.innerHTML = resultEl.innerHTML;
-  }
-  document.body.appendChild(wrapper);
-
-  // 列印
-  setTimeout(() => {
-    window.print();
-    // 列印後清除
-    setTimeout(() => {
-      document.head.removeChild(style);
-      document.body.removeChild(wrapper);
-    }, 1000);
-  }, 100);
+  window.print();
+  setTimeout(() => document.head.removeChild(style), 1000);
+  void name;
 }
 
 // ─── 主頁面 ───────────────────────────────────────────────────────────────────
