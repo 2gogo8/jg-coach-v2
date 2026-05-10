@@ -699,6 +699,5 @@ export async function clearAllStudents(): Promise<void> {
   questions.length = 0;
   insights.length = 0;
   weeklyDirection = null;
-  initPromise = null; // reset so next load re-reads from blob
   await saveStore();
 }

@@ -19,7 +19,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   const patch = await request.json();
-  const updated = updateStudent(id, patch);
+  const updated = await updateStudent(id, patch);
   if (!updated) return NextResponse.json({ error: '找不到學生' }, { status: 404 });
   return NextResponse.json(updated);
 }
