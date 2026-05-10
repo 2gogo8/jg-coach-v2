@@ -676,3 +676,15 @@ export async function getStudentAnalytics(studentId: string) {
 
   return { totalTrades: studentTrades.length, buys: buys.length, sells: sells.length, symbols, questionCount: studentQuestions.length, needsHelp };
 }
+
+// ─── Admin: Clear All Data ───
+export async function clearAllStudents(): Promise<void> {
+  await ensureStoreLoaded();
+  students.clear();
+  trades.length = 0;
+  questions.length = 0;
+  insights.length = 0;
+  weeklyDirection = null;
+  initPromise = null; // reset so next load re-reads from blob
+  await saveStore();
+}

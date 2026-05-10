@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllStudents, getStudentAnalytics } from '@/lib/store';
+import { getAllStudents, getStudentAnalytics, clearAllStudents } from '@/lib/store';
 
 export const maxDuration = 30;
 
@@ -10,4 +10,9 @@ export async function GET() {
     analytics: await getStudentAnalytics(s.id),
   })));
   return NextResponse.json(withAnalytics);
+}
+
+export async function DELETE() {
+  await clearAllStudents();
+  return NextResponse.json({ ok: true, message: '所有學生資料已清除' });
 }
