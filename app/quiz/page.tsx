@@ -421,37 +421,44 @@ function t7Level(score: number) {
   return { level: '運氣為主', color: '#FF453A', desc: '充滿好賭心態與自我欺騙，市場漲勢掩蓋了你的問題，市場一旦轉向，風險極高。' };
 }
 
-// ─── PDF 生成（截圖方式，支援中文）───────────────────────────────────────────
-async function generatePDF(name: string, type: TraderType, traits: Record<Trait, number>, weaknesses: Weakness[], answers: Record<number, string>) {
-  // 截取結果頁面的 DOM 元素轉成圖片，再放進 PDF
-  const { toPng } = await import('html-to-image');
-  const { jsPDF } = await import('jspdf');
+// ─── PDF 生成（列印方式，支援中文）───────────────────────────────────────────
+function generatePDF(_name: string, _type: TraderType, _traits: Record<Trait, number>, _weaknesses: Weakness[], _answers: Record<number, string>) {
+  // 注入列印樣式，降低關烦元素
+  const style = document.createElement('style');
+  style.id = 'print-style';
+  style.textContent = `
+    @media print {
+      body > *:not(#print-wrapper) { display: none !important; }
+      #print-wrapper { display: block !important; }
+      nav, header, footer { display: none !important; }
+      a[href]:not(.print-keep) { color: inherit !important; }
+      button { display: none !important; }
+      @page { margin: 10mm; }
+    }
+  `;
+  document.head.appendChild(style);
 
-  const el = document.getElementById('result-content');
-  if (!el) return;
+  // 建立列印專用容器
+  const wrapper = document.createElement('div');
+  wrapper.id = 'print-wrapper';
+  wrapper.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; background:#000; color:#fff; padding:20px; box-sizing:border-box; font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
 
-  try {
-    // 截圖（2x 解析度）
-    const dataUrl = await toPng(el, {
-      quality: 0.95,
-      pixelRatio: 2,
-      backgroundColor: '#000000',
-    });
-
-    const img = new Image();
-    img.src = dataUrl;
-    await new Promise(r => { img.onload = r; });
-
-    const W = 210; // A4 width mm
-    const H = (img.height / img.width) * W;
-    const doc = new jsPDF({ orientation: H > W ? 'portrait' : 'landscape', unit: 'mm', format: [W, Math.max(297, H)] });
-
-    doc.addImage(dataUrl, 'PNG', 0, 0, W, H);
-    doc.save(`${name}_交易者心理測驗結果.pdf`);
-  } catch (e) {
-    console.error('PDF generation failed:', e);
-    alert('PDF 生成失敗，請嘗試瀏覽器列印（Ctrl+P）存成 PDF');
+  // 複製結果內容
+  const resultEl = document.getElementById('result-content');
+  if (resultEl) {
+    wrapper.innerHTML = resultEl.innerHTML;
   }
+  document.body.appendChild(wrapper);
+
+  // 列印
+  setTimeout(() => {
+    window.print();
+    // 列印後清除
+    setTimeout(() => {
+      document.head.removeChild(style);
+      document.body.removeChild(wrapper);
+    }, 1000);
+  }, 100);
 }
 
 // ─── 主頁面 ───────────────────────────────────────────────────────────────────
@@ -656,7 +663,7 @@ export default function QuizPage() {
           {/* CTA */}
           <div style={{ display: 'flex', gap: 10, flexDirection: 'column' }}>
             <button
-              onClick={() => generatePDF(name, resultType, traits, triggeredWeaknesses, answers)}
+              onClick={() => generatePDF(name, resultType!, traits, triggeredWeaknesses, answers)}
               style={{ background: '#E8001A', color: '#fff', border: 'none', borderRadius: 14, padding: '16px', fontSize: 16, fontWeight: 600, cursor: 'pointer' }}
             >
               📄 下載我的個性化報告 PDF
