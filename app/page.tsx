@@ -67,7 +67,9 @@ export default function LandingPage() {
       </nav>
 
       {/* HERO */}
-      <section style={{ textAlign: 'center', padding: '56px 24px 40px', maxWidth: 680, margin: '0 auto' }}>
+      <section style={{ textAlign: 'center', padding: '56px 24px 40px', maxWidth: 680, margin: '0 auto', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', height: '100%', background: 'radial-gradient(ellipse at 50% 0%, rgba(232,0,26,0.08) 0%, transparent 60%)', pointerEvents: 'none', zIndex: 0 }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(232,0,26,0.12)', border: '1px solid rgba(232,0,26,0.25)', borderRadius: 20, padding: '5px 14px', marginBottom: 24 }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#E8001A' }} />
           <span style={{ fontSize: 12, color: '#E8001A', fontWeight: 500, letterSpacing: '0.03em' }}>20位戰友 · 真實對帳單 · 2025/12-2026/03</span>
@@ -103,10 +105,11 @@ export default function LandingPage() {
             看戰友成果 ↓
           </a>
         </div>
+        </div>
       </section>
 
       {/* STATS ROW */}
-      <section style={{ borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '32px 24px', display: 'flex', justifyContent: 'center', gap: 'clamp(24px, 6vw, 80px)', flexWrap: 'wrap' }}>
+      <section style={{ borderTop: '1px solid rgba(255,255,255,0.06)', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '40px 32px', display: 'flex', justifyContent: 'center', gap: 'clamp(24px, 6vw, 80px)', flexWrap: 'wrap' }}>
         {[
           { value: '20', label: '位戰友' },
           { value: '3+', label: '個月實戰' },
@@ -121,15 +124,15 @@ export default function LandingPage() {
       </section>
 
       {/* FEATURED SPOTLIGHT */}
-      <section style={{ padding: '64px 24px 32px', maxWidth: 520, margin: '0 auto' }}>
+      <section style={{ padding: '72px 32px 40px', maxWidth: 520, margin: '0 auto' }}>
         <div style={{ fontSize: 12, color: '#6D6D72', textAlign: 'center', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 20 }}>精選戰友</div>
 
-        <div style={{ background: 'rgba(28,28,30,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: 28, backdropFilter: 'blur(40px)', transition: 'all 0.4s ease' }}>
+        <div style={{ background: 'rgba(28,28,30,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 24, padding: 32, backdropFilter: 'blur(40px)', transition: 'all 0.4s ease' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
             <div>
               <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 8 }}>{featured.name}</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{ background: 'rgba(10,132,255,0.15)', color: '#0A84FF', border: '1px solid rgba(10,132,255,0.3)', borderRadius: 10, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>{featured.grade || '觀察'}</span>
+                <span style={{ background: 'rgba(255,255,255,0.08)', color: '#EBEBF5', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>{featured.grade || '觀察'}</span>
                 <span style={{ background: 'rgba(255,255,255,0.06)', color: '#8A8A8E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '3px 10px', fontSize: 12 }}>{featured.market}</span>
                 <span style={{ background: 'rgba(255,255,255,0.06)', color: '#8A8A8E', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '3px 10px', fontSize: 12 }}>{featured.style}</span>
               </div>
@@ -143,7 +146,7 @@ export default function LandingPage() {
           {featured.win_rate && (
             <div style={{ display: 'flex', gap: 16, marginBottom: 18, padding: '12px 16px', background: 'rgba(255,255,255,0.04)', borderRadius: 12 }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#0A84FF' }}>{featured.win_rate}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: '#EBEBF5' }}>{featured.win_rate}</div>
                 <div style={{ fontSize: 11, color: '#6D6D72' }}>勝率</div>
               </div>
               {featured.trades && (
@@ -156,7 +159,7 @@ export default function LandingPage() {
           )}
 
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <span style={{ color: '#FFD60A', fontSize: 14, marginTop: 1, flexShrink: 0 }}>✦</span>
+            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginTop: 1, flexShrink: 0 }}>✦</span>
             <p style={{ fontSize: 14, color: '#EBEBF5CC', lineHeight: 1.6, margin: 0 }}>{featured.highlight}</p>
           </div>
 
@@ -176,16 +179,16 @@ export default function LandingPage() {
       </section>
 
       {/* FULL SHOWCASE */}
-      <section id="showcase" style={{ padding: '48px 24px 32px', maxWidth: 1100, margin: '0 auto' }}>
+      <section id="showcase" style={{ padding: '60px 32px 48px', maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 8 }}>
           <h2 style={{ fontSize: 'clamp(28px, 5vw, 40px)', fontWeight: 700, letterSpacing: '-1px', margin: 0 }}>20位戰友</h2>
           <span style={{ fontSize: 14, color: '#6D6D72' }}>· 操作拆解全覽</span>
         </div>
         <p style={{ fontSize: 14, color: '#48484A', marginBottom: 32, marginTop: 4 }}>JG 親自審閱每位學員的完整交易記錄</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
           {ALL_STUDENTS.map(s => (
-            <div key={s.name} style={{ background: 'rgba(28,28,30,0.7)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 20, transition: 'border-color 0.2s' }}
+            <div key={s.name} style={{ background: 'rgba(28,28,30,0.7)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: 24, transition: 'border-color 0.2s' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}>
 
@@ -194,7 +197,7 @@ export default function LandingPage() {
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.3px', marginBottom: 6 }}>{s.name}</div>
                   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                    {s.grade && <span style={{ background: 'rgba(10,132,255,0.12)', color: '#0A84FF', borderRadius: 8, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{s.grade}</span>}
+                    {s.grade && <span style={{ background: 'rgba(255,255,255,0.08)', color: '#EBEBF5', borderRadius: 8, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{s.grade}</span>}
                     <span style={{ background: 'rgba(255,255,255,0.05)', color: '#636366', borderRadius: 8, padding: '2px 8px', fontSize: 11 }}>{s.market}</span>
                   </div>
                 </div>
@@ -207,12 +210,12 @@ export default function LandingPage() {
               {/* Mini stats */}
               <div style={{ display: 'flex', gap: 12, marginBottom: 12, padding: '8px 12px', background: 'rgba(0,0,0,0.3)', borderRadius: 10 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: s.win_rate ? '#0A84FF' : '#3A3A3C' }}>{s.win_rate || '—'}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: s.win_rate ? '#EBEBF5' : '#3A3A3C' }}>{s.win_rate || '—'}</div>
                   <div style={{ fontSize: 10, color: '#48484A' }}>勝率</div>
                 </div>
                 <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: s.trades ? '#fff' : '#3A3A3C' }}>{s.trades || '—'}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: s.trades ? '#EBEBF5' : '#3A3A3C' }}>{s.trades || '—'}</div>
                   <div style={{ fontSize: 10, color: '#48484A' }}>筆數</div>
                 </div>
                 <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
@@ -223,7 +226,7 @@ export default function LandingPage() {
 
               {/* Highlight */}
               <div style={{ display: 'flex', gap: 6 }}>
-                <span style={{ color: '#FFD60A', fontSize: 11, marginTop: 1, flexShrink: 0 }}>✦</span>
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 1, flexShrink: 0 }}>✦</span>
                 <p style={{ fontSize: 12, color: '#8A8A8E', lineHeight: 1.55, margin: 0 }}>
                   {s.highlight.length > 70 ? s.highlight.slice(0, 70) + '…' : s.highlight}
                 </p>
@@ -235,7 +238,7 @@ export default function LandingPage() {
 
       {/* WEEKLY DIRECTION */}
       {direction && (
-        <section style={{ padding: '32px 24px', maxWidth: 520, margin: '0 auto' }}>
+        <section style={{ padding: '40px 32px', maxWidth: 520, margin: '0 auto' }}>
           <div style={{ background: 'rgba(232,0,26,0.06)', border: '1px solid rgba(232,0,26,0.2)', borderRadius: 20, padding: 24, position: 'relative', overflow: 'hidden' }}>
             <div style={{ fontSize: 11, color: '#E8001A', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>本週方向</div>
             <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.7, margin: 0, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
